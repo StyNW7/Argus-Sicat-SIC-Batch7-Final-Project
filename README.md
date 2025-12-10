@@ -11,7 +11,7 @@
 <h1 align="center">Argus - Sicat Team - Samsung Innovation Campus Batch 7 - Stage 3</h1>
 <div align="center">
 
-<img src="./Images/Preview/Preview.jpg" alt="Argus Device Preview"/>
+<img src="./Images/iot-4.jpg" alt="Argus Device Preview"/>
 
 </div>
 <br>
@@ -136,38 +136,57 @@ FastAPI handles:
 
 ---
 
+## 🔗 How to Run The Code
+
+Clone the GitHub Repository then follow this documentation
+
+> [!TIP]
+> 
+> Clone the GitHub Repository then follow this documentation. Then, pip install requirements.txt or you can also make a virtual environment for this (it is up to you).
+
+### Computer Vision Module
+
+1. Change directory to Computer Vision Module.
+2. python extract_feature.py to re-run and get the dataset label.
+3. python train_mdodel_3.py to train the model.
+4. python test_model.py to test and run the model.
+
+### Speech Recognition Module
+
+1. Change directory to Speech Recognition Module.
+2. python extract_features.py to re-run and get the dataset label. (To run this you should have ffmpeg on your local machine)
+3. python train_and_evaluate _full.py to train and evaluate the model
+4. Run the speech-recog-ai-notebook.ipynb to get the visualization of the evaluation model.
+
+
+### FastAPI Server
+
+1. Change directory to the Root Folder.
+2. python fastapi_server_final.py to run the last fixed and final fusion of Speech and Vision AI Module.
+3. The FastAPI will succedd run locally on your machine and you can use the endpoint as written in the code.
+
+### Streamlit Dashboard
+
+1. Change directory to the Root Folder.
+2. streamlit run streamlit_dashboard_final.py to run the final version of Streamlit Dashboard.
+3. Make sure the FastAPI Server already run to test the Speech and Vision Module on the Dashboard.
+
+---
+
 ## 📸 &nbsp;Result Preview
 <table style="width:100%; text-align:center">
     <col width="100%">
     <tr>
-        <td width="1%" align="center"><img height="370" src="./Images/Preview/1.jpg"/></td>
+        <td width="1%" align="center"><img height="370" src="./Images/Preview/suspect.png"/></td>
     </tr>
     <tr>
-        <td width="1%" align="center">Output at Arduino IDE</td>
+        <td width="1%" align="center">Streamlit Dashboard - Light Mode</td>
     </tr>
     <tr>
-        <td width="1%" align="center"><img height="400" src="./Images/Preview/2.jpg"/></td>
+        <td width="1%" align="center"><img height="400" src="./Images/Preview/cheating.png"/></td>
     </tr>
     <tr>
-        <td width="1%" align="center">Samsung IoT Tool Kit</td>
-    </tr>
-    <tr>
-        <td width="1%" align="center"><img height="400" src="./Images/Preview/3.JPG"/></td>
-    </tr>
-    <tr>
-        <td width="1%" align="center">OLED Display Output</td>
-    </tr>
-    <tr>
-        <td width="1%" align="center"><img height="400" src="./Images/Preview/4.JPG"/></td>
-    </tr>
-    <tr>
-        <td width="1%" align="center">Argus IoT Preview</td>
-    </tr>
-    <tr>
-        <td width="1%" align="center"><img height="400" src="./Images/Preview/5.jpg"/></td>
-    </tr>
-    <tr>
-        <td width="1%" align="center">Completing the Project</td>
+        <td width="1%" align="center">Streamlit Dashboard - Dark Mode</td>
     </tr>
 </table>
 
@@ -175,9 +194,9 @@ FastAPI handles:
 
 ## 🧭 Diagram
 
-*Overall Block Components Diagram*
+*Overall End-to-end System Workflow of Argus Project*
 <p align="center">
-  <img src="./Images/Diagram/block-diagram.png" width="700">
+  <img src="./Diagram/end-to-end.png" width="700">
 </p>
 
 This diagram illustrates how the IoT devices, AI inference modules, backend server, and dashboard interact within the Argus ecosystem.
