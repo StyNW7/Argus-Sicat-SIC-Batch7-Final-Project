@@ -30,4 +30,4 @@ while cap.isOpened() and saved < jumlah_foto:
     count += 1
 
 cap.release()
-print("✅ Selesai! 15 foto berhasil diekstrak.")
+print("Selesai! 15 foto berhasil diekstrak.")

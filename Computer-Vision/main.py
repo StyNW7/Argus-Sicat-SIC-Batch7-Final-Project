@@ -1,15 +1,3 @@
-"""
-YOLOv8 + face-alignment based proctoring
-Features:
-1) Eyeball/gaze (left/right/up)
-2) Mouth-open detection with baseline
-3) Instance/person count (segmentation via YOLO)
-4) Phone detection (YOLO)
-5) Head-pose estimation (solvePnP)
-6) Face spoofing heuristic (blink + motion)
-Logs CSV + optional screenshot on CHEATING
-"""
-
 import cv2, time, os, math
 import numpy as np
 import pandas as pd

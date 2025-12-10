@@ -1,4 +1,3 @@
-// esp32_audio_client.ino
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <driver/i2s.h>

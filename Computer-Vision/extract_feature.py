@@ -1,18 +1,3 @@
-#!/usr/bin/env python3
-"""
-generate_dataset_no_yolo.py
-
-Features:
-- Tanpa YOLO (NO object detection)
-- Menggunakan face_alignment untuk:
-  - gaze
-  - mouth open
-  - head pose (yaw & pitch)
-- Robust terhadap landmark gagal / gambar rusak
-- Output CSV + auto label:
-  CHEATING / SUSPECT / NOT_CHEATING
-"""
-
 import os
 import math
 from pathlib import Path
