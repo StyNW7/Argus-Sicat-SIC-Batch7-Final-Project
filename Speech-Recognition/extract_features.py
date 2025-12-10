@@ -1,15 +1,3 @@
-#!/usr/bin/env python3
-"""
-ROBUST extract_features.py
-
-Fitur:
-- Mendukung semua format audio (m4a, mp3, wav, ogg, flac)
-- Jika gagal load → otomatis convert ke wav via FFmpeg
-- Logging file sukses/gagal
-- Skip file rusak atau terlalu pendek
-- Aman digunakan untuk dataset Argus Speech Recognition
-"""
-
 import argparse
 from pathlib import Path
 import subprocess

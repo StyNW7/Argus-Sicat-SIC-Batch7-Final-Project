@@ -155,7 +155,7 @@ Clone the GitHub Repository then follow this documentation
 
 1. Change directory to Speech Recognition Module.
 2. python extract_features.py to re-run and get the dataset label. (To run this you should have ffmpeg on your local machine)
-3. python train_and_evaluate _full.py to train and evaluate the model
+3. python train_and_evaluate_full.py --csv audio_dataset_final.csv --out_dir models_output_final to train and evaluate the model
 4. Run the speech-recog-ai-notebook.ipynb to get the visualization of the evaluation model.
 
 
