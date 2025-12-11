@@ -202,7 +202,7 @@ Clone the GitHub Repository then follow this documentation
 
 *Overall End-to-end System Workflow of Argus Project*
 <p align="center">
-  <img src="./Diagram/end-to-end.png" width="700">
+  <img src="./Diagram/end-to-end-flow.png" width="700">
 </p>
 
 This diagram illustrates how the IoT devices, AI inference modules, backend server, and dashboard interact within the Argus ecosystem.
