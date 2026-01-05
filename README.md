@@ -8,7 +8,7 @@
     </div>
 </div>
 <br>
-<h1 align="center">Argus - Sicat Team - Samsung Innovation Campus Batch 7 - Stage 3</h1>
+<h1 align="center">Argus - Sicat Team - Samsung Innovation Campus Batch 7 - Stage 4</h1>
 <div align="center">
 
 <img src="./Images/iot-4.jpg" alt="Argus Device Preview"/>
@@ -218,7 +218,7 @@ This Repository is created by Team Sicat - Samsung Innovation Campus
 <li>Jazzlyn Amelia Lim</li>
 <li>Visella</li>
 </ul>
-As Final Project for SIC Batch 7 Stage 3
+As Final Project for SIC Batch 7 Stage 4
 
 ---
 
