@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useEffect } from 'react';
 import { Menu, X, Eye, Shield, Brain, Zap, Users, TrendingUp, CheckCircle2, ChevronDown, Mail, Phone, Linkedin, Twitter, Github, Play, ArrowRight, Camera, Mic, Cpu, BarChart3, Clock, Lock } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
