@@ -1,33 +1,47 @@
 "use client";
 
-import React, { useState } from 'react';
-import { User, Mail, Check, Copy, ArrowRight, Shield, Eye, EyeOff } from 'lucide-react';
-import Link from 'next/link';
+import React, { useState } from "react";
+import {
+  User,
+  Mail,
+  Check,
+  Copy,
+  ArrowRight,
+  Shield,
+  Eye,
+  EyeOff,
+} from "lucide-react";
+import Link from "next/link";
 
 type Props = {
-  onSubmit?: (data: { name: string; email: string; password: string; nim: string }) => Promise<void> | void;
+  onSubmit?: (data: {
+    name: string;
+    email: string;
+    password: string;
+    nim: string;
+  }) => Promise<void> | void;
 };
 
 const RegisterPage = ({ onSubmit }: Props) => {
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    acceptTerms: false
+    name: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+    acceptTerms: false,
   });
-  
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [generatedNIM, setGeneratedNIM] = useState('');
+  const [generatedNIM, setGeneratedNIM] = useState("");
   const [isNIMCopied, setIsNIMCopied] = useState(false);
 
   const generateRandomNIM = () => {
     // Generate 10-digit random NIM
-    const nim = Array.from({ length: 10 }, () => 
+    const nim = Array.from({ length: 10 }, () =>
       Math.floor(Math.random() * 10)
-    ).join('');
-    
+    ).join("");
+
     setGeneratedNIM(nim);
     setIsNIMCopied(false);
     return nim;
@@ -43,39 +57,41 @@ const RegisterPage = ({ onSubmit }: Props) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (formData.password !== formData.confirmPassword) {
       alert("Passwords don't match!");
       return;
     }
-    
+
     if (!formData.acceptTerms) {
       alert("Please accept the terms and conditions");
       return;
     }
-    
+
     // Generate NIM if not already generated
     const nim = generatedNIM || generateRandomNIM();
-    
+
     const registrationData = {
       name: formData.name,
       email: formData.email,
       nim: nim,
-      password: formData.password
+      password: formData.password,
     };
     if (onSubmit) {
       onSubmit(registrationData);
     } else {
-      console.log('Registration data:', registrationData);
-      alert(`Registration successful! Your NIM is: ${nim}\nPlease save this for future logins.`);
+      console.log("Registration data:", registrationData);
+      alert(
+        `Registration successful! Your NIM is: ${nim}\nPlease save this for future logins.`
+      );
     }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: type === "checkbox" ? checked : value,
     }));
   };
 
@@ -99,32 +115,44 @@ const RegisterPage = ({ onSubmit }: Props) => {
             <div className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full text-white font-semibold text-sm shadow-lg mb-6">
               🎓 JOIN ARGUS
             </div>
-            
+
             <h1 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-6 leading-tight">
               Start Your Journey with
               <span className="block bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
                 Intelligent Proctoring
               </span>
             </h1>
-            
+
             <p className="text-lg text-gray-600 font-medium leading-relaxed">
-              Create your account and get access to our AI-powered exam monitoring platform. 
-              Ensure academic integrity with cutting-edge technology.
+              Create your account and get access to our AI-powered exam
+              monitoring platform. Ensure academic integrity with cutting-edge
+              technology.
             </p>
           </div>
 
           <div className="space-y-6">
             {[
-              { title: 'AI-Powered Monitoring', desc: 'Advanced computer vision and speech recognition' },
-              { title: 'Real-Time Analytics', desc: 'Comprehensive dashboards and reporting tools' },
-              { title: '24/7 Support', desc: 'Dedicated team ready to assist you anytime' }
+              {
+                title: "AI-Powered Monitoring",
+                desc: "Advanced computer vision and speech recognition",
+              },
+              {
+                title: "Real-Time Analytics",
+                desc: "Comprehensive dashboards and reporting tools",
+              },
+              {
+                title: "24/7 Support",
+                desc: "Dedicated team ready to assist you anytime",
+              },
             ].map((feature, idx) => (
               <div key={idx} className="flex items-center space-x-4">
                 <div className="bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl p-3">
                   <Check className="w-6 h-6 text-blue-600" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900">{feature.title}</h3>
+                  <h3 className="font-semibold text-gray-900">
+                    {feature.title}
+                  </h3>
                   <p className="text-gray-600 text-sm">{feature.desc}</p>
                 </div>
               </div>
@@ -139,7 +167,9 @@ const RegisterPage = ({ onSubmit }: Props) => {
               <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-4 rounded-xl inline-block mb-4">
                 <User className="w-10 h-10 text-white" />
               </div>
-              <h2 className="text-2xl font-bold text-gray-900">Create Your Account</h2>
+              <h2 className="text-2xl font-bold text-gray-900">
+                Create Your Account
+              </h2>
               <p className="text-gray-600 font-medium mt-2">
                 Fill in your details to get started
               </p>
@@ -256,7 +286,9 @@ const RegisterPage = ({ onSubmit }: Props) => {
               {generatedNIM && (
                 <div className="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-semibold text-blue-800">Your NIM:</span>
+                    <span className="font-semibold text-blue-800">
+                      Your NIM:
+                    </span>
                     <button
                       type="button"
                       onClick={copyToClipboard}
@@ -296,12 +328,18 @@ const RegisterPage = ({ onSubmit }: Props) => {
                   required
                 />
                 <label className="ml-2 block text-sm text-gray-700 font-medium">
-                  I agree to the{' '}
-                  <Link href="/terms" className="text-blue-600 hover:text-blue-800 font-semibold">
+                  I agree to the{" "}
+                  <Link
+                    href="/terms"
+                    className="text-blue-600 hover:text-blue-800 font-semibold"
+                  >
                     Terms of Service
-                  </Link>{' '}
-                  and{' '}
-                  <Link href="/privacy" className="text-blue-600 hover:text-blue-800 font-semibold">
+                  </Link>{" "}
+                  and{" "}
+                  <Link
+                    href="/privacy"
+                    className="text-blue-600 hover:text-blue-800 font-semibold"
+                  >
                     Privacy Policy
                   </Link>
                 </label>
@@ -338,7 +376,8 @@ const RegisterPage = ({ onSubmit }: Props) => {
 
           <div className="mt-8 text-center">
             <p className="text-sm text-gray-600 font-medium">
-              By creating an account, you&apos;ll receive your unique NIM for secure access.
+              By creating an account, you&apos;ll receive your unique NIM for
+              secure access.
             </p>
           </div>
         </div>

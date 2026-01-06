@@ -5,13 +5,22 @@ import { Eye, EyeOff, Lock, Mail, ArrowRight, Shield } from "lucide-react";
 import Link from "next/link";
 
 type Props = {
-  onSubmit?: (data: { emailOrNim: string; password: string; rememberMe: boolean }) => Promise<void> | void;
+  onSubmit?: (data: {
+    emailOrNim: string;
+    password: string;
+    rememberMe: boolean;
+  }) => Promise<void> | void;
   initial?: { emailOrNim?: string };
   loading?: boolean;
   externalError?: string | null;
 };
 
-const LoginPage = ({ onSubmit, initial, loading = false, externalError = null }: Props) => {
+const LoginPage = ({
+  onSubmit,
+  initial,
+  loading = false,
+  externalError = null,
+}: Props) => {
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     emailOrNim: initial?.emailOrNim || "",
@@ -186,13 +195,19 @@ const LoginPage = ({ onSubmit, initial, loading = false, externalError = null }:
                 </Link>
               </div>
 
-              {externalError && <div className="text-sm text-red-600 font-medium">{externalError}</div>}
+              {externalError && (
+                <div className="text-sm text-red-600 font-medium">
+                  {externalError}
+                </div>
+              )}
               <button
                 type="submit"
                 disabled={loading}
                 className="w-full group px-8 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold text-lg rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 disabled:opacity-60"
               >
-                {loading ? 'Signing in...' : (
+                {loading ? (
+                  "Signing in..."
+                ) : (
                   <>
                     Sign In
                     <ArrowRight className="inline-block ml-2 group-hover:translate-x-1 transition-transform" />
