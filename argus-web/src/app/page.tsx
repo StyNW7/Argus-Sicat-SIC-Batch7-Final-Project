@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -47,10 +48,10 @@ const Navigation = () => {
               </a>
             ))}
             <a
-              href="#contact"
+              href="/login"
               className="px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
             >
-              Get Started
+              Login
             </a>
           </div>
 
@@ -583,7 +584,7 @@ const ArgusLandingPage = () => {
       <WhyArgusSection />
       <TestimonialsSection />
       <FAQSection />
-      <CTASection />
+      {/* <CTASection /> */}
       <Footer />
     </div>
   );
