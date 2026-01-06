@@ -7,7 +7,7 @@
             <p><i>Integrity Through Intelligent Vision 👁️</i></p>
     </div>
 </div>
-<br>
+<br> 
 <h1 align="center">Argus - Sicat Team - Samsung Innovation Campus Batch 7 - Stage 4</h1>
 <div align="center">
 
