@@ -4,7 +4,11 @@ import React, { useState } from 'react';
 import { User, Mail, Check, Copy, ArrowRight, Shield, Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 
-const RegisterPage = () => {
+type Props = {
+  onSubmit?: (data: { name: string; email: string; password: string; nim: string }) => Promise<void> | void;
+};
+
+const RegisterPage = ({ onSubmit }: Props) => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -59,11 +63,12 @@ const RegisterPage = () => {
       nim: nim,
       password: formData.password
     };
-    
-    console.log('Registration data:', registrationData);
-    
-    // Here you would typically send data to your backend
-    alert(`Registration successful! Your NIM is: ${nim}\nPlease save this for future logins.`);
+    if (onSubmit) {
+      onSubmit(registrationData);
+    } else {
+      console.log('Registration data:', registrationData);
+      alert(`Registration successful! Your NIM is: ${nim}\nPlease save this for future logins.`);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {

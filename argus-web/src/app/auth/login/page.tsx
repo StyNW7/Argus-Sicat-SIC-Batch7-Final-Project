@@ -1,28 +1,35 @@
 "use client";
 
-import React, { useState } from 'react';
-import { Eye, EyeOff, Lock, Mail, ArrowRight, Shield } from 'lucide-react';
-import Link from 'next/link';
+import React, { useState } from "react";
+import { Eye, EyeOff, Lock, Mail, ArrowRight, Shield } from "lucide-react";
+import Link from "next/link";
 
-const LoginPage = () => {
+type Props = {
+  onSubmit?: (data: { emailOrNim: string; password: string; rememberMe: boolean }) => Promise<void> | void;
+  initial?: { emailOrNim?: string };
+  loading?: boolean;
+  externalError?: string | null;
+};
+
+const LoginPage = ({ onSubmit, initial, loading = false, externalError = null }: Props) => {
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
-    emailOrNim: '',
-    password: '',
-    rememberMe: false
+    emailOrNim: initial?.emailOrNim || "",
+    password: "",
+    rememberMe: false,
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle login logic here
-    console.log('Login data:', formData);
+    if (onSubmit) await onSubmit(formData);
+    else console.log("Login data:", formData);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: type === "checkbox" ? checked : value,
     }));
   };
 
@@ -46,17 +53,18 @@ const LoginPage = () => {
             <div className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full text-white font-semibold text-sm shadow-lg mb-6">
               🔐 SECURE ACCESS
             </div>
-            
+
             <h1 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-6 leading-tight">
               Welcome Back to
               <span className="block bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
                 Argus Proctoring
               </span>
             </h1>
-            
+
             <p className="text-lg text-gray-600 font-medium leading-relaxed">
-              Sign in to access your dashboard and manage exam monitoring sessions securely. 
-              Your privacy and security are our top priorities.
+              Sign in to access your dashboard and manage exam monitoring
+              sessions securely. Your privacy and security are our top
+              priorities.
             </p>
           </div>
 
@@ -66,18 +74,24 @@ const LoginPage = () => {
                 <Shield className="w-8 h-8 text-blue-600" />
               </div>
               <div>
-                <h3 className="font-semibold text-gray-900">Enterprise Security</h3>
-                <p className="text-gray-600 text-sm">Military-grade encryption for all data</p>
+                <h3 className="font-semibold text-gray-900">
+                  Enterprise Security
+                </h3>
+                <p className="text-gray-600 text-sm">
+                  Military-grade encryption for all data
+                </p>
               </div>
             </div>
-            
+
             <div className="flex items-center space-x-4">
               <div className="bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl p-4">
                 <Lock className="w-8 h-8 text-blue-600" />
               </div>
               <div>
                 <h3 className="font-semibold text-gray-900">Privacy First</h3>
-                <p className="text-gray-600 text-sm">Your data is protected and never shared</p>
+                <p className="text-gray-600 text-sm">
+                  Your data is protected and never shared
+                </p>
               </div>
             </div>
           </div>
@@ -90,7 +104,9 @@ const LoginPage = () => {
               <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-4 rounded-xl inline-block mb-4">
                 <Lock className="w-10 h-10 text-white" />
               </div>
-              <h2 className="text-2xl font-bold text-gray-900">Sign In to Your Account</h2>
+              <h2 className="text-2xl font-bold text-gray-900">
+                Sign In to Your Account
+              </h2>
               <p className="text-gray-600 font-medium mt-2">
                 Enter your credentials to continue
               </p>
@@ -161,8 +177,8 @@ const LoginPage = () => {
                     Remember me
                   </label>
                 </div>
-                
-                <Link 
+
+                <Link
                   href="/forgot-password"
                   className="text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors"
                 >
@@ -170,12 +186,18 @@ const LoginPage = () => {
                 </Link>
               </div>
 
+              {externalError && <div className="text-sm text-red-600 font-medium">{externalError}</div>}
               <button
                 type="submit"
-                className="w-full group px-8 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold text-lg rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
+                disabled={loading}
+                className="w-full group px-8 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold text-lg rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 disabled:opacity-60"
               >
-                Sign In
-                <ArrowRight className="inline-block ml-2 group-hover:translate-x-1 transition-transform" />
+                {loading ? 'Signing in...' : (
+                  <>
+                    Sign In
+                    <ArrowRight className="inline-block ml-2 group-hover:translate-x-1 transition-transform" />
+                  </>
+                )}
               </button>
 
               <div className="relative my-6">
@@ -190,7 +212,7 @@ const LoginPage = () => {
               </div>
 
               <Link
-                href="/register"
+                href="/auth/register"
                 className="block w-full px-8 py-3 bg-white text-gray-800 font-semibold text-lg rounded-lg border border-gray-200 shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 text-center"
               >
                 Create New Account
@@ -198,12 +220,18 @@ const LoginPage = () => {
 
               <div className="text-center mt-6">
                 <p className="text-sm text-gray-600 font-medium">
-                  By continuing, you agree to our{' '}
-                  <Link href="/terms" className="text-blue-600 hover:text-blue-800 font-semibold">
+                  By continuing, you agree to our{" "}
+                  <Link
+                    href="/terms"
+                    className="text-blue-600 hover:text-blue-800 font-semibold"
+                  >
                     Terms of Service
-                  </Link>{' '}
-                  and{' '}
-                  <Link href="/privacy" className="text-blue-600 hover:text-blue-800 font-semibold">
+                  </Link>{" "}
+                  and{" "}
+                  <Link
+                    href="/privacy"
+                    className="text-blue-600 hover:text-blue-800 font-semibold"
+                  >
                     Privacy Policy
                   </Link>
                 </p>
@@ -213,8 +241,11 @@ const LoginPage = () => {
 
           <div className="mt-8 text-center">
             <p className="text-gray-600 font-medium">
-              Need help?{' '}
-              <Link href="/support" className="text-blue-600 hover:text-blue-800 font-semibold">
+              Need help?{" "}
+              <Link
+                href="/support"
+                className="text-blue-600 hover:text-blue-800 font-semibold"
+              >
                 Contact Support
               </Link>
             </p>
