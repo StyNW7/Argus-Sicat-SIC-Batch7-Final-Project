@@ -18,6 +18,7 @@ requests
 # sounddevice dihapus karena sering error di cloud & tidak punya akses hardware
 librosa
 soundfile
+sounddevice
 
 # Deep learning and computer vision
 # Menghapus versi spesifik agar pip mencari wheel linux yang cocok
