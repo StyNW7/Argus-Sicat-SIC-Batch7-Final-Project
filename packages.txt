@@ -4,3 +4,4 @@ libasound2-dev
 libportaudio2
 portaudio19-dev
 libgl1-mesa-glx
+ffmpeg
