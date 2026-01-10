@@ -36,6 +36,39 @@ TOPIC_AUDIO = os.getenv("HIVEMQ_TOPIC_AUDIO", "esp32mic/audio")
 SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY") or os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
 
+
+def _try_load_argus_web_env():
+    """If no supabase env vars set, try to load them from argus-web/.env file."""
+    global SUPABASE_URL, SUPABASE_KEY
+    if SUPABASE_URL and SUPABASE_KEY:
+        return
+    candidate = Path(__file__).parent / "argus-web" / ".env"
+    if not candidate.exists():
+        candidate = Path(__file__).parent / "argus-web" / ".env.local"
+    if not candidate.exists():
+        return
+    try:
+        logger.info("Reading Supabase credentials from %s", candidate)
+        with open(candidate, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                k = k.strip()
+                v = v.strip().strip('"').strip("'")
+                if k == "NEXT_PUBLIC_SUPABASE_URL" and not SUPABASE_URL:
+                    SUPABASE_URL = v
+                if k == "NEXT_PUBLIC_SUPABASE_ANON_KEY" and not SUPABASE_KEY:
+                    SUPABASE_KEY = v
+    except Exception as e:
+        logger.warning("Failed to read argus-web .env for Supabase: %s", e)
+
+
+_try_load_argus_web_env()
+
 if not SUPABASE_URL or not SUPABASE_KEY:
     logger.warning("Supabase URL or KEY not set. Uploads will be skipped until provided.")
 
@@ -124,9 +157,19 @@ def classify_image_bytes(img_bytes):
 
 
 def supabase_client():
+    # create and cache a supabase client
     if not SUPABASE_URL or not SUPABASE_KEY:
         return None
-    return create_client(SUPABASE_URL, SUPABASE_KEY)
+    if hasattr(supabase_client, "_client") and supabase_client._client is not None:
+        return supabase_client._client
+    try:
+        c = create_client(SUPABASE_URL, SUPABASE_KEY)
+        supabase_client._client = c
+        return c
+    except Exception as e:
+        logger.exception("Failed to create Supabase client: %s", e)
+        supabase_client._client = None
+        return None
 
 
 def upload_to_supabase(device_id, event_type, label, timestamp, file_bytes, ext):
@@ -137,12 +180,62 @@ def upload_to_supabase(device_id, event_type, label, timestamp, file_bytes, ext)
 
     bucket = "ai-files"
     path = f"{device_id}/{event_type}/{int(timestamp)}.{ext}"
+    file_path = None
     try:
         # Try to upload to storage (will create object path)
-        res = client.storage.from_(bucket).upload(path, file_bytes)
-        logger.info("Uploaded file to storage: %s", path)
+        bio = io.BytesIO(file_bytes)
+        # create bucket if not exists (best-effort)
+        try:
+            buckets = client.storage.list_buckets()
+            if isinstance(buckets, dict) and buckets.get("error"):
+                # ignore
+                pass
+        except Exception:
+            pass
+
+        try:
+            # upload bytes
+            res = client.storage.from_(bucket).upload(path, bio.getvalue())
+            logger.info("Uploaded file to storage: %s", path)
+            # try to get a public URL for the file
+            try:
+                pub = client.storage.from_(bucket).get_public_url(path)
+                # get_public_url may return dict or object with 'publicUrl' key
+                if isinstance(pub, dict):
+                    file_path = pub.get("publicUrl") or pub.get("public_url")
+                else:
+                    # if it's a string or has attribute
+                    try:
+                        file_path = pub.publicUrl
+                    except Exception:
+                        file_path = str(pub)
+            except Exception:
+                # fallback to storing the raw storage path
+                file_path = path
+        except Exception as e:
+            logger.warning("Could not upload file to storage (bucket %s) — %s", bucket, e)
+            # Try creating bucket then upload
+            try:
+                client.storage.create_bucket(bucket)
+                bio.seek(0)
+                res = client.storage.from_(bucket).upload(path, bio.getvalue())
+                logger.info("Uploaded file after creating bucket: %s", path)
+                try:
+                    pub = client.storage.from_(bucket).get_public_url(path)
+                    if isinstance(pub, dict):
+                        file_path = pub.get("publicUrl") or pub.get("public_url")
+                    else:
+                        try:
+                            file_path = pub.publicUrl
+                        except Exception:
+                            file_path = str(pub)
+                except Exception:
+                    file_path = path
+            except Exception as e2:
+                logger.warning("Still failed uploading to storage: %s", e2)
+
     except Exception as e:
-        logger.warning("Could not upload file to storage (bucket %s) — %s", bucket, e)
+        logger.warning("Unexpected error during storage upload: %s", e)
 
     # Insert metadata row to 'ai_events'
     row = {
@@ -150,7 +243,7 @@ def upload_to_supabase(device_id, event_type, label, timestamp, file_bytes, ext)
         "event_type": event_type,
         "label": label,
         "timestamp": int(timestamp),
-        "file_path": path,
+        "file_path": file_path,
     }
     try:
         r = client.table("ai_events").insert(row).execute()

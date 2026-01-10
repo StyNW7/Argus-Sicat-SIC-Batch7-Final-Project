@@ -77,6 +77,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--mqtt", action="store_true", help="publish to MQTT instead of saving locally")
     parser.add_argument("--classify", action="store_true", help="classify locally after capture (imports ai_mqtt_consumer)")
+    parser.add_argument("--upload", action="store_true", help="upload captured file and metadata to Supabase (requires credentials)")
     args = parser.parse_args()
 
     try:
@@ -93,6 +94,7 @@ def main():
             f.write(frame)
         logger.info("Saved frame to %s", path)
 
+        label = None
         if args.classify:
             try:
                 from ai_mqtt_consumer import classify_image_bytes
@@ -100,6 +102,15 @@ def main():
                 logger.info("Local classification result: %s", label)
             except Exception as e:
                 logger.exception("Could not classify locally: %s", e)
+
+        if args.upload:
+            try:
+                from ai_mqtt_consumer import upload_to_supabase
+                ts = int(time.time())
+                upload_to_supabase(DEVICE_ID, "vision", label or "none", ts, frame, "jpg")
+                logger.info("Uploaded frame and metadata to Supabase (attempted)")
+            except Exception as e:
+                logger.exception("Upload to Supabase failed: %s", e)
 
     except Exception as e:
         logger.exception("Error capturing/publishing frame: %s", e)

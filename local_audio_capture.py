@@ -83,6 +83,7 @@ def main():
     parser.add_argument("--duration", type=float, default=3.0, help="seconds to record")
     parser.add_argument("--mqtt", action="store_true", help="publish to MQTT instead of saving locally")
     parser.add_argument("--classify", action="store_true", help="classify locally after capture (imports ai_mqtt_consumer)")
+    parser.add_argument("--upload", action="store_true", help="upload captured file and metadata to Supabase (requires credentials)")
     args = parser.parse_args()
 
     audio = record_wav_bytes(duration=args.duration)
@@ -100,6 +101,7 @@ def main():
         f.write(audio)
     logger.info("Saved audio to %s", path)
 
+    label = None
     if args.classify:
         try:
             from ai_mqtt_consumer import classify_audio_bytes
@@ -107,6 +109,15 @@ def main():
             logger.info("Local classification result: %s", label)
         except Exception as e:
             logger.exception("Could not classify locally: %s", e)
+
+    if args.upload:
+        try:
+            from ai_mqtt_consumer import upload_to_supabase
+            ts = int(time.time())
+            upload_to_supabase(DEVICE_ID, "audio", label or "none", ts, audio, "wav")
+            logger.info("Uploaded audio and metadata to Supabase (attempted)")
+        except Exception as e:
+            logger.exception("Upload to Supabase failed: %s", e)
 
 
 if __name__ == "__main__":
