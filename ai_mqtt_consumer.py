@@ -172,14 +172,18 @@ def supabase_client():
         return None
 
 
-def upload_to_supabase(device_id, event_type, label, timestamp, file_bytes, ext):
+def upload_to_supabase(device_id, event_type, label, timestamp, file_bytes, ext, filename=None):
     client = supabase_client()
     if client is None:
         logger.info("Supabase client not configured; skipping upload metadata.")
         return None
 
     bucket = "ai-files"
-    path = f"{device_id}/{event_type}/{int(timestamp)}.{ext}"
+    if filename:
+        # allow callers to provide a custom filename (should include extension)
+        path = f"{device_id}/{event_type}/{filename}"
+    else:
+        path = f"{device_id}/{event_type}/{int(timestamp)}.{ext}"
     file_path = None
     try:
         # Try to upload to storage (will create object path)
@@ -248,10 +252,10 @@ def upload_to_supabase(device_id, event_type, label, timestamp, file_bytes, ext)
     try:
         r = client.table("ai_events").insert(row).execute()
         logger.info("Inserted metadata row into ai_events: %s", r)
-        return r
+        return {"insert": r, "file_path": file_path}
     except Exception as e:
         logger.exception("Failed to insert metadata into ai_events: %s", e)
-        return None
+        return {"insert": None, "file_path": file_path}
 
 
 def on_connect(client, userdata, flags, rc):
