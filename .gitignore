@@ -2,3 +2,5 @@
 .env
 /local_output
 /__pycache__
+
+/venv/

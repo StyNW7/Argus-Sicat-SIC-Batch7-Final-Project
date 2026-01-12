@@ -37,6 +37,6 @@ protobuf==4.25.1
 
 # For audio format conversion (needs system ffmpeg)
 # System dependency: ffmpeg
-supabase==1.4.0
+supabase>=2.0.0
 python-dotenv==1.0.0
 pydub==0.25.1
