@@ -514,8 +514,11 @@ def process_iot_audio_chunk(mqtt_client, device_id, seq, audio_list):
                 json_resp['vision_error'] = str(e2)
             # attempt local audio classification
             try:
-                if mp3_bytes:
-                    alab = classify_audio_bytes(mp3_bytes)
+                # if mp3_bytes:
+                #     alab = classify_audio_bytes(mp3_bytes)
+                #     json_resp['audio_label'] = alab
+                if wav_bytes: 
+                    alab = classify_audio_bytes(wav_bytes) 
                     json_resp['audio_label'] = alab
             except Exception as e3:
                 logger.warning("Local audio classification failed: %s", e3)
