@@ -514,12 +514,12 @@ def process_iot_audio_chunk(mqtt_client, device_id, seq, audio_list):
                 json_resp['vision_error'] = str(e2)
             # attempt local audio classification
             try:
-                # if mp3_bytes:
-                #     alab = classify_audio_bytes(mp3_bytes)
-                #     json_resp['audio_label'] = alab
-                if wav_bytes: 
-                    alab = classify_audio_bytes(wav_bytes) 
+                if mp3_bytes:
+                    alab = classify_audio_bytes(mp3_bytes)
                     json_resp['audio_label'] = alab
+                # if wav_bytes: 
+                #     alab = classify_audio_bytes(wav_bytes) 
+                #     json_resp['audio_label'] = alab
             except Exception as e3:
                 logger.warning("Local audio classification failed: %s", e3)
                 json_resp['audio_error'] = str(e3)
@@ -541,6 +541,112 @@ def process_iot_audio_chunk(mqtt_client, device_id, seq, audio_list):
         logger.info("Published integrity result to %s: %s", topic, payload)
     except Exception as e:
         logger.exception("Failed processing iot audio chunk: %s", e)
+
+
+# def process_iot_audio_chunk(mqtt_client, device_id, seq, audio_list):
+#     """Process incoming audio chunk: convert, fetch frame, classify, UPLOAD TO SUPABASE, and publish result."""
+#     try:
+#         # 1. Filter audio yang terlalu pendek (Noise)
+#         if len(audio_list) < 512:
+#             return 
+
+#         logger.info("Processing audio chunk seq=%s for device=%s (samples=%d)", seq, device_id, len(audio_list))
+#         wav_bytes, upload_bytes, upload_ext, upload_mime = convert_pcm_to_audio_bytes(audio_list)
+        
+#         if wav_bytes is None or upload_bytes is None:
+#             logger.warning("No audio produced for device %s", device_id)
+#             return
+
+#         # 2. Ambil Frame Kamera (Dengan Logika Cache agar tidak Timeout)
+#         frame_bytes = _fetch_mjpeg_frame(CAMERA_MJPEG_URL, timeout=2)
+        
+#         # Jika gagal ambil baru, pakai yang terakhir diingat (Cache)
+#         if frame_bytes is None:
+#             if device_id in last_frame_by_device:
+#                 frame_bytes = last_frame_by_device[device_id]
+#             else:
+#                 pass # Tidak ada gambar sama sekali
+
+#         # 3. Kirim ke AI API (FastAPI) - Opsional
+#         files = {}
+#         multipart = {}
+#         if frame_bytes:
+#             files['image'] = ('frame.jpg', frame_bytes, 'image/jpeg')
+#         files['audio'] = (f"audio.{upload_ext}", upload_bytes, upload_mime)
+#         multipart['device_id'] = device_id
+#         multipart['upload'] = 'true' # Ini memberi tahu Server untuk upload (jika server jalan)
+        
+#         json_resp = {}
+#         try:
+#             # Timeout dipercepat jadi 5 detik agar tidak lag
+#             resp = requests.post(f"{AI_API_URL}/api/classify_both", files=files, data=multipart, timeout=5)
+#             json_resp = resp.json() if resp.ok else {'error': f'status {resp.status_code}'}
+#         except Exception as e:
+#             # Fallback ke AI Lokal jika Server mati
+#             json_resp = {'error': str(e), 'local_fallback': True}
+            
+#             # Lokal Vision
+#             try:
+#                 if frame_bytes:
+#                     vlab = classify_image_bytes(frame_bytes)
+#                     json_resp['vision_label'] = vlab
+#             except Exception as e2:
+#                 pass
+            
+#             # Lokal Audio
+#             try:
+#                 if wav_bytes: 
+#                     alab = classify_audio_bytes(wav_bytes) 
+#                     json_resp['audio_label'] = alab
+#             except Exception as e3:
+#                 pass
+
+#         # 4. Extract Label
+#         vision_label = json_resp.get('image_label') or json_resp.get('vision_label')
+#         audio_label = json_resp.get('audio_label')
+        
+#         # 5. --- BAGIAN PENTING: UPLOAD KE SUPABASE ---
+#         # Kita upload manual dari sini agar tidak tergantung server FastAPI
+#         current_time = time.time()
+        
+#         # A. Upload Audio
+#         if upload_bytes:
+#             upload_to_supabase(
+#                 device_id=device_id, 
+#                 event_type="audio", 
+#                 label=audio_label or "unknown", 
+#                 timestamp=current_time, 
+#                 file_bytes=upload_bytes, 
+#                 ext=upload_ext
+#             )
+            
+#         # B. Upload Gambar (Snapshot saat suara terjadi)
+#         if frame_bytes:
+#             upload_to_supabase(
+#                 device_id=device_id, 
+#                 event_type="vision", 
+#                 label=vision_label or "unknown", 
+#                 timestamp=current_time, 
+#                 file_bytes=frame_bytes, 
+#                 ext="jpg",
+#                 filename=f"{int(current_time)}_snapshot.jpg" # Tambah suffix biar beda
+#             )
+#         # ---------------------------------------------
+
+#         # 6. Hitung Integrity & Publish ke MQTT
+#         integrity_score, color_label = _compute_integrity_and_label(vision_label or 'none', audio_label or 'none')
+
+#         payload = {
+#             'device_id': device_id,
+#             'integrity_score': round(integrity_score/100, 3),
+#             'label': color_label,
+#         }
+#         topic = os.getenv('HIVEMQ_RESULT_TOPIC', 'iot/integrity/result')
+#         mqtt_client.publish(topic, json.dumps(payload))
+#         logger.info("Published integrity result: score=%s, label=%s", payload['integrity_score'], payload['label'])
+
+#     except Exception as e:
+#         logger.exception("Failed processing iot audio chunk: %s", e)
 
 
 def main():
