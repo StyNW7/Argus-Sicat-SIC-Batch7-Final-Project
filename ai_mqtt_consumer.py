@@ -18,6 +18,12 @@ import librosa
 import paho.mqtt.client as mqtt
 from supabase import create_client
 from dotenv import load_dotenv
+import requests
+from pydub import AudioSegment
+import array
+import shutil
+import urllib.parse
+import wave
 
 
 logging.basicConfig(level=logging.INFO)
@@ -31,10 +37,20 @@ HIVEMQ_PORT = int(os.getenv("HIVEMQ_PORT", "8883"))
 HIVEMQ_USER = os.getenv("HIVEMQ_USER")
 HIVEMQ_PASS = os.getenv("HIVEMQ_PASS")
 TOPIC_FRAME = os.getenv("HIVEMQ_TOPIC_FRAME", "esp32cam/frame")
-TOPIC_AUDIO = os.getenv("HIVEMQ_TOPIC_AUDIO", "esp32mic/audio")
+TOPIC_AUDIO = os.getenv("HIVEMQ_TOPIC_AUDIO", "iot/audio/chunk")
+AI_API_URL = os.getenv("AI_API_URL", "http://localhost:8000")
+CAMERA_MJPEG_URL = os.getenv("CAMERA_MJPEG_URL", "http://172.20.10.3/stream")
+
+# PCM conversion defaults (from user instructions)
+PCM_SAMPLE_RATE = int(os.getenv("PCM_SAMPLE_RATE", "44100"))
+PCM_SAMPLE_WIDTH = int(os.getenv("PCM_SAMPLE_WIDTH", "2"))
+PCM_CHANNELS = int(os.getenv("PCM_CHANNELS", "2"))
 
 SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY") or os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+
+# simple in-memory cache to keep the last frame per device (used when MJPEG fetch fails)
+last_frame_by_device = {}
 
 
 def _try_load_argus_web_env():
@@ -68,6 +84,28 @@ def _try_load_argus_web_env():
 
 
 _try_load_argus_web_env()
+
+
+def _normalize_ai_api_url(url):
+    """If AI_API_URL uses a wildcard host like 0.0.0.0, replace with localhost (127.0.0.1).
+    This is useful when the server binds to 0.0.0.0 but clients must connect to loopback.
+    """
+    try:
+        p = urllib.parse.urlparse(url)
+        host = p.hostname
+        if host in ("0.0.0.0", "::"):
+            port = p.port or (80 if p.scheme == 'http' else 443)
+            new_netloc = f"127.0.0.1:{port}"
+            new_url = urllib.parse.urlunparse((p.scheme or 'http', new_netloc, p.path or '', p.params or '', p.query or '', p.fragment or ''))
+            logger.info("Normalized AI_API_URL from %s to %s", url, new_url)
+            return new_url
+    except Exception:
+        pass
+    return url
+
+
+# normalize AI API url early
+AI_API_URL = _normalize_ai_api_url(AI_API_URL)
 
 if not SUPABASE_URL or not SUPABASE_KEY:
     logger.warning("Supabase URL or KEY not set. Uploads will be skipped until provided.")
@@ -290,21 +328,216 @@ def on_message(client, userdata, msg):
     try:
         if msg.topic == TOPIC_FRAME:
             # classify image
+            # prefer device_id embedded in payload if present
+            try:
+                text = msg.payload.decode('utf-8')
+                obj = json.loads(text)
+                if isinstance(obj, dict) and obj.get('device_id'):
+                    device_id = obj.get('device_id')
+            except Exception:
+                pass
+
             label = classify_image_bytes(data_bytes)
-            logger.info("Vision label: %s", label)
+            logger.info("Vision label for %s: %s", device_id, label)
+            # cache the frame for this device so audio processing can reuse it
+            try:
+                last_frame_by_device[device_id] = data_bytes
+            except Exception:
+                pass
             ext = fmt or "jpg"
             upload_to_supabase(device_id, "vision", label, timestamp_val, data_bytes, ext)
 
         elif msg.topic == TOPIC_AUDIO:
-            # classify audio
-            label = classify_audio_bytes(data_bytes)
-            logger.info("Audio label: %s", label)
-            ext = fmt or "wav"
-            upload_to_supabase(device_id, "audio", label, timestamp_val, data_bytes, ext)
+            # If payload was JSON with "audio" array, handle chunk processing
+            try:
+                text = msg.payload.decode('utf-8')
+                obj = json.loads(text)
+            except Exception:
+                obj = None
+
+            if obj and isinstance(obj, dict) and 'audio' in obj:
+                seq = obj.get('seq')
+                # audio is array of ints
+                audio_list = obj.get('audio', [])
+                # prefer device_id in the audio JSON if available
+                device_from_payload = obj.get('device_id') if isinstance(obj, dict) else None
+                use_device = device_from_payload or device_id
+                # Process async style: convert to MP3, fetch frame, send to AI API, compute integrity, publish result
+                process_iot_audio_chunk(client, use_device, seq, audio_list)
+            else:
+                # fallback: treat raw bytes as wav and classify
+                label = classify_audio_bytes(data_bytes)
+                logger.info("Audio label: %s", label)
+                ext = fmt or "wav"
+                upload_to_supabase(device_id, "audio", label, timestamp_val, data_bytes, ext)
         else:
             logger.info("Unhandled topic %s", msg.topic)
     except Exception as e:
         logger.exception("Failed to process message: %s", e)
+
+
+def _fetch_mjpeg_frame(mjpeg_url, timeout=5):
+    """Grab one JPEG frame from an MJPEG multipart stream URL."""
+    try:
+        r = requests.get(mjpeg_url, stream=True, timeout=timeout)
+        bytes_buf = b""
+        for chunk in r.iter_content(chunk_size=1024):
+            if chunk:
+                bytes_buf += chunk
+                start = bytes_buf.find(b"\xff\xd8")
+                end = bytes_buf.find(b"\xff\xd9")
+                if start != -1 and end != -1 and end > start:
+                    jpg = bytes_buf[start:end+2]
+                    return jpg
+    except Exception as e:
+        logger.warning("Failed to fetch MJPEG frame: %s", e)
+    return None
+
+
+def _pcm_list_to_mp3_bytes(int_list, sample_rate=PCM_SAMPLE_RATE, sample_width=PCM_SAMPLE_WIDTH, channels=PCM_CHANNELS):
+    """Convert list of signed integers (PCM) to MP3 bytes using pydub."""
+    # Deprecated: legacy function kept for compatibility; prefer `convert_pcm_to_audio_bytes`.
+    return None
+
+
+def convert_pcm_to_audio_bytes(int_list, sample_rate=PCM_SAMPLE_RATE, sample_width=PCM_SAMPLE_WIDTH, channels=PCM_CHANNELS):
+    """Convert int16 PCM list to WAV bytes for classification and to upload bytes (MP3 if ffmpeg available, else WAV).
+    Returns tuple: (wav_bytes_for_classify, upload_bytes, ext, mime)
+    """
+    if not int_list:
+        return None, None, None, None
+    # pack into signed short (int16)
+    try:
+        arr = array.array('h', int_list)
+        raw_bytes = arr.tobytes()
+    except Exception as e:
+        logger.exception("Failed to pack PCM ints: %s", e)
+        return None, None, None, None
+
+    # produce WAV bytes for classification
+    try:
+        wav_io = io.BytesIO()
+        with wave.open(wav_io, 'wb') as w:
+            w.setnchannels(channels)
+            w.setsampwidth(sample_width)
+            w.setframerate(sample_rate)
+            w.writeframes(raw_bytes)
+        wav_io.seek(0)
+        wav_bytes = wav_io.read()
+    except Exception as e:
+        logger.exception("Failed to create WAV bytes: %s", e)
+        return None, None, None, None
+
+    # decide upload format
+    ffmpeg_path = shutil.which('ffmpeg')
+    if ffmpeg_path:
+        try:
+            audio = AudioSegment(data=raw_bytes, sample_width=sample_width, frame_rate=sample_rate, channels=channels)
+            out_io = io.BytesIO()
+            audio.export(out_io, format='mp3')
+            out_io.seek(0)
+            mp3_bytes = out_io.read()
+            return wav_bytes, mp3_bytes, 'mp3', 'audio/mpeg'
+        except Exception as e:
+            logger.warning("MP3 export failed despite ffmpeg present, falling back to WAV: %s", e)
+
+    # fallback to WAV upload
+    return wav_bytes, wav_bytes, 'wav', 'audio/wav'
+
+
+def _compute_integrity_and_label(vision_label, audio_label):
+    """Map labels to suspiciousness scores and compute integrity score (0-100) and color label."""
+    # suspiciousness: 0 (safe) -> 100 (very suspicious)
+    vision_map = {
+        'focus': 0,
+        'looking_away': 60,
+        'head_down': 80,
+        'multiple_faces': 90,
+        'unknown': 50,
+        'none': 50
+    }
+    audio_map = {
+        'normal_conversation': 0,
+        'whispering': 70,
+        'silence': 40,
+        'unknown': 50,
+        'none': 50
+    }
+    v_score = vision_map.get(vision_label, 50)
+    a_score = audio_map.get(audio_label, 50)
+    integrity = 100 - (v_score * 0.6 + a_score * 0.4)
+    integrity = max(0, min(100, integrity))
+    # label thresholds
+    if integrity >= 70:
+        label = 'green'
+    elif integrity >= 50:
+        label = 'yellow'
+    else:
+        label = 'red'
+    return integrity, label
+
+
+def process_iot_audio_chunk(mqtt_client, device_id, seq, audio_list):
+    """Process incoming audio chunk from IoT device: convert to MP3, fetch frame, call AI API, compute integrity, publish result."""
+    try:
+        logger.info("Processing audio chunk seq=%s for device=%s (samples=%d)", seq, device_id, len(audio_list))
+        wav_bytes, upload_bytes, upload_ext, upload_mime = convert_pcm_to_audio_bytes(audio_list)
+        if wav_bytes is None or upload_bytes is None:
+            logger.warning("No audio produced for device %s", device_id)
+            return
+
+        # fetch one frame from camera stream
+        frame_bytes = _fetch_mjpeg_frame(CAMERA_MJPEG_URL)
+
+        # Send to AI API classify_both
+        files = {}
+        multipart = {}
+        if frame_bytes:
+            files['image'] = ('frame.jpg', frame_bytes, 'image/jpeg')
+        files['audio'] = (f"audio.{upload_ext}", upload_bytes, upload_mime)
+        multipart['device_id'] = device_id
+        multipart['upload'] = 'true'
+        try:
+            resp = requests.post(f"{AI_API_URL}/api/classify_both", files=files, data=multipart, timeout=10)
+            json_resp = resp.json() if resp.ok else {'error': f'status {resp.status_code}'}
+        except Exception as e:
+            # AI API unreachable — fall back to local classification to keep pipeline working
+            logger.warning("AI API request failed, falling back to local classification: %s", e)
+            json_resp = {'error': str(e), 'local_fallback': True}
+            # attempt local vision classification if we have a frame
+            try:
+                if frame_bytes:
+                    vlab = classify_image_bytes(frame_bytes)
+                    json_resp['vision_label'] = vlab
+            except Exception as e2:
+                logger.warning("Local vision classification failed: %s", e2)
+                json_resp['vision_error'] = str(e2)
+            # attempt local audio classification
+            try:
+                if mp3_bytes:
+                    alab = classify_audio_bytes(mp3_bytes)
+                    json_resp['audio_label'] = alab
+            except Exception as e3:
+                logger.warning("Local audio classification failed: %s", e3)
+                json_resp['audio_error'] = str(e3)
+
+        # Extract labels
+        vision_label = json_resp.get('image_label') if isinstance(json_resp, dict) else None
+        audio_label = json_resp.get('audio_label') if isinstance(json_resp, dict) else None
+        # compute integrity
+        integrity_score, color_label = _compute_integrity_and_label(vision_label or 'none', audio_label or 'none')
+
+        # Publish minimal JSON payload as requested
+        payload = {
+            'device_id': device_id,
+            'integrity_score': round(integrity_score/100, 3),
+            'label': color_label,
+        }
+        topic = os.getenv('HIVEMQ_RESULT_TOPIC', 'iot/integrity/result')
+        mqtt_client.publish(topic, json.dumps(payload))
+        logger.info("Published integrity result to %s: %s", topic, payload)
+    except Exception as e:
+        logger.exception("Failed processing iot audio chunk: %s", e)
 
 
 def main():
@@ -312,7 +545,11 @@ def main():
         logger.error("HIVEMQ_HOST not configured in environment")
         return
 
-    client = mqtt.Client()
+    # Use MQTTv311 to avoid deprecated callback API warnings
+    try:
+        client = mqtt.Client(protocol=mqtt.MQTTv311)
+    except Exception:
+        client = mqtt.Client()
     if HIVEMQ_USER and HIVEMQ_PASS:
         client.username_pw_set(HIVEMQ_USER, HIVEMQ_PASS)
 

@@ -1,3 +1,4 @@
 .vscode/settings.json
 .env
 /local_output
+/__pycache__
