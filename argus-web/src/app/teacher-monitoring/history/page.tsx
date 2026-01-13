@@ -647,8 +647,8 @@ export default function TeacherDashboard() {
                               <div className="flex items-center gap-2">
                                 <div className="w-24 bg-gray-100 rounded-full h-2">
                                   <div 
-                                    className={`h-2 rounded-full ${parseFloat(event.confidence) > 0.7 ? 'bg-green-500' : 'bg-orange-500'}`}
-                                    style={{ width: `${event.confidence * 100}%` }}
+                                    className={`h-2 rounded-full ${typeof event.confidence === 'number' ? event.confidence : parseFloat(event.confidence as string) > 0.7 ? 'bg-green-500' : 'bg-orange-500'}`}
+                                    style={{ width: `${(typeof event.confidence === 'number' ? event.confidence : parseFloat(event.confidence as string)) * 100}%` }}
                                   ></div>
                                 </div>
                                 <span className="text-sm font-medium text-gray-700">
