@@ -1,4 +1,3 @@
-# streamlit_dashboard.py
 import streamlit as st
 import requests
 import time
