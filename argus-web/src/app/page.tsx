@@ -4,6 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { Menu, X, Eye, Shield, Brain, Zap, Users, TrendingUp, CheckCircle2, ChevronDown, Mail, Phone, Linkedin, Twitter, Github, Play, ArrowRight, Camera, Mic, Cpu, BarChart3, Clock, Lock } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import Image from 'next/image';
 
 // Navigation Component
 const Navigation = () => {
@@ -30,8 +31,14 @@ const Navigation = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-20">
           <div className="flex items-center space-x-3 group cursor-pointer">
-            <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-2 rounded-lg transition-transform group-hover:scale-105">
-              <Eye className="w-8 h-8 text-white" />
+            <div className="rounded-lg transition-transform group-hover:scale-105">
+              <Eye className="w-8 h-8 text-blue-600" />
+              {/* <Image
+                src="/Logo.png"
+                width={100}
+                height={5}
+                alt="test"
+              /> */}
             </div>
             <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">ARGUS</span>
           </div>
