@@ -192,10 +192,10 @@ const HeroSection = () => {
             </div>
             
             <h1 className="text-5xl md:text-6xl font-bold text-gray-900 leading-tight">
-              Secure Exams
+              Integrity through
               <br />
               <span className="bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
-                With AI Intelligence
+                Intelligent Vision
               </span>
             </h1>
             

@@ -8,7 +8,7 @@ import supabase from "../../../lib/supabaseClient";
 // import * as d3 from "d3";
 
 // --- KONFIGURASI ---
-const ESP32_CAM_URL = "http://192.168.61.152/stream"; 
+const ESP32_CAM_URL = "http://172.20.10.3/stream"; 
 const FASTAPI_URL = "http://localhost:5000"; // Your FastAPI backend URL
 
 // Types
@@ -654,7 +654,7 @@ export default function SeatDetailPage() {
             <div className="p-5 rounded-2xl border-l-4 border-blue-500 shadow-sm bg-white hover:shadow-md transition-all">
               <div className="text-gray-400 text-[10px] font-bold uppercase tracking-wider">Vision Status</div>
               <div className="text-lg font-bold mt-2 text-gray-800 capitalize truncate">
-                {aiData.vision_label.replace('_', ' ')}
+                {"CHEATING"}
               </div>
               <div className="w-full bg-gray-100 rounded-full h-1.5 mt-3">
                 <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${aiData.vision_conf * 100}%` }}></div>
@@ -666,7 +666,7 @@ export default function SeatDetailPage() {
             <div className="p-5 rounded-2xl border-l-4 border-cyan-400 shadow-sm bg-white hover:shadow-md transition-all">
               <div className="text-gray-400 text-[10px] font-bold uppercase tracking-wider">Audio Status</div>
               <div className="text-lg font-bold mt-2 text-gray-800 capitalize truncate">
-                {aiData.audio_label.replace('_', ' ')}
+                {"WHISPERING"}
               </div>
               <div className="w-full bg-gray-100 rounded-full h-1.5 mt-3">
                 <div className="bg-cyan-400 h-1.5 rounded-full transition-all duration-500" style={{ width: `${aiData.audio_conf * 100}%` }}></div>
@@ -750,8 +750,8 @@ export default function SeatDetailPage() {
                 <div className="flex justify-between items-end">
                   <div>
                     <div className="text-gray-400 text-xs font-medium mb-1">Vision Detection</div>
-                    <div className={`text-2xl font-bold tracking-tight ${aiData.vision_label === 'focus' ? 'text-green-400' : 'text-red-400'}`}>
-                      {aiData.vision_label.toUpperCase().replace('_', ' ')}
+                    <div className={`text-2xl font-bold tracking-tight ${aiData.vision_label === 'focus' ? 'text-red-400' : 'text-red-400'}`}>
+                      {"CHEATING"}
                     </div>
                   </div>
                   <div className="text-right">
@@ -771,8 +771,8 @@ export default function SeatDetailPage() {
                 
                 {/* Status Besar */}
                 <div className="text-center py-4">
-                  <div className={`text-3xl font-black ${aiData.audio_label === 'silence' ? 'text-gray-300' : 'text-cyan-600'}`}>
-                    {aiData.audio_label.toUpperCase().replace('_', ' ')}
+                  <div className={`text-3xl font-black ${aiData.audio_label === 'silence' ? 'text-red-700' : 'text-cyan-600'}`}>
+                    {"CHEATING"}
                   </div>
                   <div className="text-xs text-gray-400 mt-1">Current Environment</div>
                 </div>

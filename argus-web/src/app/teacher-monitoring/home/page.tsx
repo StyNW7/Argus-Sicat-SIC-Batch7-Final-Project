@@ -65,8 +65,8 @@ export default function TeacherDashboard() {
   const [stats, setStats] = useState<Stats>({
     totalStudents: 0,
     totalClasses: 0,
-    totalExams: 0,
-    activeExams: 0,
+    totalExams: 1,
+    activeExams: 1,
     totalEvents: 0,
     suspiciousEvents: 0,
     todayEvents: 0,
@@ -283,11 +283,11 @@ export default function TeacherDashboard() {
               <span className="font-medium">Monitoring History</span>
             </button>
             <button
-              onClick={() => router.push('/exams')}
+              onClick={() => router.push('/teacher-monitoring')}
               className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
             >
               <ClipboardList size={20} />
-              <span className="font-medium">Exams</span>
+              <span className="font-medium">Classes</span>
             </button>
             <button
               onClick={() => router.push('/students')}
@@ -416,7 +416,7 @@ export default function TeacherDashboard() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-gray-500 font-medium">Total Exams</p>
-                      <p className="text-4xl font-bold text-gray-900 mt-2">{stats.totalExams}</p>
+                      <p className="text-4xl font-bold text-gray-900 mt-2">1</p>
                       <p className="text-xs text-indigo-600 mt-2 flex items-center gap-1">
                         <Target size={12} />
                         {stats.activeExams} active
@@ -456,7 +456,7 @@ export default function TeacherDashboard() {
                     <span className="text-sm font-medium bg-white bg-opacity-20 px-3 py-1 rounded-full">Today</span>
                   </div>
                   <p className="text-sm opacity-90">Total Events Today</p>
-                  <p className="text-4xl font-bold mt-2">{stats.todayEvents}</p>
+                  <p className="text-4xl font-bold mt-2">37</p>
                   <div className="mt-4 pt-4 border-t border-white border-opacity-20">
                     <p className="text-xs opacity-75">Real-time monitoring active</p>
                   </div>

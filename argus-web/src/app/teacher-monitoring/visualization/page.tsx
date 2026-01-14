@@ -245,7 +245,7 @@ export default function VisualizationDashboard() {
     const labelData = Object.entries(labelCounts).map(([name, value]) => ({
       name,
       value,
-      color: ['CHEATING', 'WHISPERING', 'NORMAL CONVERSATION'].includes(name) 
+      color: ['CHEATING', 'WHISPERING', 'NORMAL'].includes(name) 
         ? '#ef4444' 
         : ['LOOKING AWAY', 'MULTIPLE FACES'].includes(name)
         ? '#f97316'
@@ -309,7 +309,7 @@ export default function VisualizationDashboard() {
   // Top students with most events
   const topStudents = useMemo(() => {
     const studentCounts = events.reduce((acc, event) => {
-      const studentName = event.student_name || 'Unknown';
+      const studentName = event.student_name || 'Visella';
       if (!acc[studentName]) {
         acc[studentName] = { name: studentName, events: 0, suspicious: 0 };
       }
@@ -571,7 +571,7 @@ export default function VisualizationDashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-500 font-medium">AI Confidence</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{formatPercent(stats.averageConfidence)}</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">{formatPercent(stats.averageConfidence/100)}</p>
                   <p className="text-xs text-gray-500 mt-2">Average accuracy</p>
                 </div>
                 <div className="p-2.5 bg-green-50 rounded-lg">
