@@ -11,7 +11,7 @@
 <h1 align="center">Argus - Sicat Team - Samsung Innovation Campus Batch 7 - Stage 4</h1>
 <div align="center">
 
-<img src="./Images/iot-4.jpg" alt="Argus Device Preview"/>
+<img src="./Images/IoT/Front.jpeg" alt="Argus Device Preview"/>
 
 </div>
 <br>
@@ -29,6 +29,10 @@ Video Demo Link:
 
 <div align="center">
 
+<kbd><img src="https://raw.githubusercontent.com/marwin1991/profile-technology-icons/refs/heads/main/icons/next_js.png" height="60" /></kbd>
+<kbd><img src="https://raw.githubusercontent.com/marwin1991/profile-technology-icons/refs/heads/main/icons/typescript.png" height="60" /></kbd>
+<kbd><img src="https://raw.githubusercontent.com/marwin1991/profile-technology-icons/refs/heads/main/icons/tailwind_css.png" height="60" /></kbd>
+<kbd><img src="https://raw.githubusercontent.com/marwin1991/profile-technology-icons/refs/heads/main/icons/supabase.png" height="60" /></kbd>
 <kbd><img src="./Images/esp32.png" height="60" /></kbd>
 <kbd><img src="./Images/cpp.png" height="60" /></kbd>
 <kbd><img src="https://raw.githubusercontent.com/marwin1991/profile-technology-icons/refs/heads/main/icons/arduino.png" height="60" /></kbd>
@@ -38,7 +42,7 @@ Video Demo Link:
 </div>
 
 <div align="center">
-<h4>ESP32 | C++ (.ino) | Python | Computer Vision | Speech Recognition | Streamlit</h4>
+<h4>Next JS | TypeScript | TailwindCSS | Supabase | ESP32 | C++ (.ino) | Python | Computer Vision | Speech Recognition | Streamlit</h4>
 </div>
 
 ---
@@ -52,6 +56,8 @@ Argus uses a trained ResNet-based CNN model to detect:
 - Unauthorized presence
 - Strange posture or look-away events
 - Possible cheating behaviors
+
+The Computer Vision Model will classify the output to 3 labels: Suspect, Cheating, Not Cheating
 
 🔍 *AI-powered visual integrity.*
 
@@ -73,12 +79,24 @@ This allows the system to differentiate harmless dialogue from cheating behavior
 ### 🌐 IoT Camera & Microphone Data Streaming
 
 The ESP32 sends camera frames and audio packets to the backend using:
-- HTTP streaming
+- HTTP streaming for Camera
+- MQTT Protocol for Microphone and Controlling the IoT
 - WiFi-based segmented audio uploads
 
 Backend runs AI inference on the received data and updates the dashboard in real-time.
 
 📡 *Lightweight, responsive IoT integration.*
+
+---
+
+### 🌐 Fullstack Website Dashboard
+
+Major update for Argus, which we make a Fullstack Website Dashboard for Student and Teacher.
+- Built on NextJS, TypeScript, TailwindCSS, and Supabase which is the modern technology stack for Website right now.
+- Support RBAC (Role Based Access Controll)
+- There are many pages for Teacher which are: Class Monitoring, Monitoring Student, See Exam History and their ai event logs, etc.
+
+📈 *Clean, Responsive, Friendly UI*
 
 ---
 
@@ -115,8 +133,8 @@ FastAPI handles:
 - INMP411 Ominichannel Microphone
 - LED
 - Buzzer
-- Push Button
-- Breadboard + Jumper Cables
+- Breadboard Small + Jumper Cables
+- Battery
 
 ---
 
@@ -158,12 +176,18 @@ Clone the GitHub Repository then follow this documentation
 3. python train_and_evaluate_full.py --csv audio_dataset_final.csv --out_dir models_output_final to train and evaluate the model
 4. Run the speech-recog-ai-notebook.ipynb to get the visualization of the evaluation model.
 
-
 ### FastAPI Server
 
 1. Change directory to the Root Folder.
 2. python fastapi_server_final.py to run the last fixed and final fusion of Speech and Vision AI Module.
 3. The FastAPI will succedd run locally on your machine and you can use the endpoint as written in the code.
+
+### NextJS Fullstack Website
+
+1. Change directory to the Root Folder then cd (change directory) to argus-web directory.
+2. npm install and then npm run dev to open the web locally.
+3. However, you need to have the .env file for the Supabase Credential.
+4. If you want to try the website, you can also use the live website and login as Admin with this credential (NIM/Email: adminnim, Password: adminpass).
 
 ### Streamlit Dashboard
 
@@ -182,6 +206,24 @@ Clone the GitHub Repository then follow this documentation
 ## 📸 &nbsp;Result Preview
 <table style="width:100%; text-align:center">
     <col width="100%">
+    <tr>
+        <td width="1%" align="center"><img height="370" src="./Images/Casing/Inside.jpeg"/></td>
+    </tr>
+    <tr>
+        <td width="1%" align="center">Argus Prototype</td>
+    </tr>
+    <tr>
+        <td width="1%" align="center"><img height="370" src="./Images/Preview/monitoring-history.png"/></td>
+    </tr>
+    <tr>
+        <td width="1%" align="center">Website - Monitoring  History</td>
+    </tr>
+    <tr>
+        <td width="1%" align="center"><img height="370" src="./Images/Preview/audio-detail.png"/></td>
+    </tr>
+    <tr>
+        <td width="1%" align="center">Website - Audio Detail Logs</td>
+    </tr>
     <tr>
         <td width="1%" align="center"><img height="370" src="./Images/Preview/suspect.png"/></td>
     </tr>
@@ -202,10 +244,10 @@ Clone the GitHub Repository then follow this documentation
 
 *Overall End-to-end System Workflow of Argus Project*
 <p align="center">
-  <img src="./Diagram/end-to-end-flow.png" width="700">
+  <img src="./Images/flowchart.png" width="700">
 </p>
 
-This diagram illustrates how the IoT devices, AI inference modules, backend server, and dashboard interact within the Argus ecosystem.
+This diagram illustrates how the IoT devices, AI inference modules, backend server, and website interact within the Argus ecosystem.
 
 ---
 
