@@ -5,9 +5,12 @@ import React, { useState, useEffect } from 'react';
 import { Menu, X, Eye, Shield, Brain, Zap, Users, TrendingUp, CheckCircle2, ChevronDown, Mail, Phone, Linkedin, Twitter, Github, Play, ArrowRight, Camera, Mic, Cpu, BarChart3, Clock, Lock } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import Image from 'next/image';
+import { useRouter } from "next/navigation";
 
 // Navigation Component
 const Navigation = () => {
+
+  
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -169,6 +172,14 @@ const Footer = () => {
 
 // Hero Section
 const HeroSection = () => {
+
+  const router = useRouter();
+
+  const handleClickLogin = (e: { preventDefault: () => void; }) => {
+    e.preventDefault()
+    router.push("/login")
+  }
+
   return (
     <section id="home" className="pt-32 pb-20 bg-gradient-to-br from-blue-50 via-white to-blue-50 relative overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-br from-transparent via-blue-50/50 to-transparent"></div>
@@ -193,14 +204,14 @@ const HeroSection = () => {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 pt-4">
-              <button className="group px-8 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold text-lg rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
-                Start Free Trial
+              <button className="group px-8 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold text-lg rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1" onClick={handleClickLogin}>
+                Login
                 <ArrowRight className="inline-block ml-2 group-hover:translate-x-1 transition-transform" />
               </button>
               
               <button className="group px-8 py-4 bg-white text-gray-800 font-semibold text-lg rounded-lg border border-gray-200 shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
                 <Play className="inline-block mr-2" />
-                Watch Demo
+                Watch Video Demo
               </button>
             </div>
           </div>

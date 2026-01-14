@@ -90,8 +90,8 @@ export default function SeatDetailPage() {
 
   // Exam info
   const [examName, setExamName] = useState("Samsung Innovation Campus Final Exam");
-  const [studentId, setStudentId] = useState("2702217125");
-  const [studentName, setStudentName] = useState("Stanley Nathanael Wijaya");
+  const [studentId, setStudentId] = useState("2702220611");
+  const [studentName, setStudentName] = useState("Visella");
   const [examDuration, setExamDuration] = useState(60);
   const [timeRemaining, setTimeRemaining] = useState(60 * 60);
 
@@ -628,7 +628,7 @@ export default function SeatDetailPage() {
         <div className="mt-4 md:mt-0 text-right">
           <div className="text-xs text-gray-400 uppercase tracking-wider font-bold mb-1">Connected Device</div>
           <div className="font-mono bg-gray-100 px-3 py-1.5 rounded-lg text-gray-700 border border-gray-200 shadow-sm inline-block">
-            {seat.device_id || "No Device Linked"}
+            {seat.device_id || "Device ID: ARG-001"}
           </div>
         </div>
       </div>

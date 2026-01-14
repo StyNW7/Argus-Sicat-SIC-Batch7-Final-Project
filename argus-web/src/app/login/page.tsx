@@ -28,7 +28,7 @@ export default function LoginPage() {
     ) {
       localStorage.setItem("isAdmin", "1");
       setLoading(false);
-      router.push("/teacher-monitoring");
+      router.push("/teacher-monitoring/home");
       return;
     }
 
