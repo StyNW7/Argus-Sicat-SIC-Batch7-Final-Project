@@ -416,7 +416,7 @@ export default function VisionDetailPage() {
                   </div>
                   <div className="text-right">
                     <p className="text-2xl font-bold text-blue-600">
-                      {event.confidence ? `${(event.confidence * 100).toFixed(1)}%` : "92.3%"}
+                      {event.confidence}%
                     </p>
                   </div>
                 </div>
