@@ -8,7 +8,7 @@ import supabase from "../../../lib/supabaseClient";
 // import * as d3 from "d3";
 
 // --- KONFIGURASI ---
-const ESP32_CAM_URL = "http://192.168.61.218/stream"; 
+const ESP32_CAM_URL = "http://192.168.61.152/stream"; 
 const FASTAPI_URL = "http://localhost:5000"; // Your FastAPI backend URL
 
 // Types
