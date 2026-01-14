@@ -14,7 +14,6 @@ import {
   BarChart3,
   Clock,
   AlertCircle,
-  TrendingUp,
   RefreshCw,
   Home,
   ClipboardList,
@@ -468,7 +467,7 @@ export default function TeacherDashboard() {
         {/* Main Content Area */}
         <main className="flex-1 px-4 sm:px-6 lg:px-8 py-8">
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between">
                 <div>
@@ -529,7 +528,7 @@ export default function TeacherDashboard() {
               </div>
             </div>
 
-            <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+            {/* <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-gray-500 font-medium">Recent (24h)</p>
@@ -542,7 +541,7 @@ export default function TeacherDashboard() {
               <div className="mt-3 pt-3 border-t border-gray-100">
                 <p className="text-xs text-gray-500">Last 24 hours</p>
               </div>
-            </div>
+            </div> */}
           </div>
 
           {/* Filters - UPDATED SECTION */}
