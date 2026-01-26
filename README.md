@@ -8,7 +8,9 @@
     </div>
 </div>
 <br>
-<h1 align="center">Argus - Sicat Team - Samsung Innovation Campus Batch 7 - Stage 4</h1>
+<h1 align="center">Argus - Sicat Team - Samsung Innovation Campus Batch 7
+<br>
+Culminating Event</h1>
 <div align="center">
 
 <img src="./Images/IoT/Front.jpeg" alt="Argus Device Preview"/>
@@ -21,7 +23,7 @@ Argus is a next-generation AI + IoT proctoring system designed to maintain acade
 It integrates Computer Vision, Speech Recognition, and IoT sensors to detect abnormal user behavior such as whispering, unauthorized talking, suspicious movements, and so on.
 
 Video Demo Link: 
-...
+https://bit.ly/Argus-Sicat-Demo-Video-Stage4 
 
 ---
 
@@ -253,14 +255,14 @@ This diagram illustrates how the IoT devices, AI inference modules, backend serv
 
 ## 👥 Owner
 
-This Repository is created by Team Sicat - Samsung Innovation Campus
+This Repository is created by Team Sicat - Samsung Innovation Campus 7
 <ul>
 <li>Stanley Nathanael Wijaya - Team Leader</li>
 <li>Clarissa Aditjakra</li>
 <li>Jazzlyn Amelia Lim</li>
 <li>Visella</li>
 </ul>
-As Final Project for SIC Batch 7 Stage 4
+As a Final Project for SIC Batch 7 (Culminating Event)
 
 ---
 
