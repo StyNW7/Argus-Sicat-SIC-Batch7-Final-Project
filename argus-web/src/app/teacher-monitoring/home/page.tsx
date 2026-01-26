@@ -290,14 +290,7 @@ export default function TeacherDashboard() {
               <span className="font-medium">Classes</span>
             </button>
             <button
-              onClick={() => router.push('/students')}
-              className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
-            >
-              <Users size={20} />
-              <span className="font-medium">Students</span>
-            </button>
-            <button
-              onClick={() => router.push('/reports')}
+              onClick={() => router.push('/teacher-monitoring/visualization')}
               className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
             >
               <FileText size={20} />

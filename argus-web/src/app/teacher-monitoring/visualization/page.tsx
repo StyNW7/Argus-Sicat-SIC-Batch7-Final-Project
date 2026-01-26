@@ -31,6 +31,7 @@ import {
   UserCheck,
   Shield,
   Bell,
+  FileText,
 } from "lucide-react";
 
 // Recharts components
@@ -365,11 +366,11 @@ export default function VisualizationDashboard() {
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center">
-                <Brain className="w-6 h-6 text-white" />
+                <Eye className="w-6 h-6 text-white" />
               </div>
               <div>
                 <h2 className="font-bold text-gray-900">Argus</h2>
-                <p className="text-xs text-gray-500">Analytics Dashboard</p>
+                <p className="text-xs text-gray-500">Exam Monitor</p>
               </div>
             </div>
             <button
@@ -390,31 +391,25 @@ export default function VisualizationDashboard() {
               <span className="font-medium">Dashboard</span>
             </button>
             <button
-              onClick={() => router.push('/teacher-monitoring/history')}
+            onClick={() => router.push('/teacher-monitoring/history')}
               className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
             >
               <BarChart3 size={20} />
               <span className="font-medium">Monitoring History</span>
             </button>
             <button
-              className="w-full flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl shadow-sm"
-            >
-              <Activity size={20} />
-              <span className="font-medium">Visualization</span>
-            </button>
-            <button
-              onClick={() => router.push('/exams')}
+              onClick={() => router.push('/teacher-monitoring')}
               className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
             >
               <ClipboardList size={20} />
-              <span className="font-medium">Exams</span>
+              <span className="font-medium">Classes</span>
             </button>
             <button
-              onClick={() => router.push('/students')}
-              className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
+              onClick={() => router.push('/teacher-monitoring/visualization')}
+              className="w-full flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl shadow-sm"
             >
-              <Users size={20} />
-              <span className="font-medium">Students</span>
+              <FileText size={20} />
+              <span className="font-medium">Reports</span>
             </button>
           </nav>
 

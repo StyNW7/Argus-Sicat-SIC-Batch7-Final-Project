@@ -272,7 +272,7 @@ export default function TeacherMonitoringPage() {
           <button
             className="px-3 py-2 bg-gray-200 rounded"
             onClick={() => {
-              localStorage.removeItem("isAdmin");
+              // localStorage.removeItem("isAdmin");
               window.location.href = "/teacher-monitoring/home";
             }}
           >

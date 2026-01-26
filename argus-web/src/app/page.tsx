@@ -110,9 +110,11 @@ const Footer = () => {
   };
 
   return (
+
     <footer className="bg-gradient-to-b from-gray-900 to-gray-950 text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
+
+        {/* <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
           <div className="space-y-6">
             <div className="flex items-center space-x-3">
               <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-2 rounded-lg">
@@ -152,19 +154,20 @@ const Footer = () => {
               </ul>
             </div>
           ))}
-        </div>
+        </div> */}
 
-        <div className="mt-12 pt-8 border-t border-gray-800">
+        <div>
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             <p className="text-gray-500 font-medium">
-              © 2024 Argus. All rights reserved.
+              © 2026 Argus. All rights reserved.
             </p>
             <div className="flex space-x-6">
-              <a href="#" className="text-gray-400 hover:text-white font-medium">Privacy Policy</a>
-              <a href="#" className="text-gray-400 hover:text-white font-medium">Terms of Service</a>
+              <a href="#" className="text-gray-400 hover:text-white font-medium">Team Sicat</a>
+              <a href="#" className="text-gray-400 hover:text-white font-medium">BINUS University</a>
             </div>
           </div>
         </div>
+        
       </div>
     </footer>
   );
