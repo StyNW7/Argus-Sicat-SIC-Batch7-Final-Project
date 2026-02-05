@@ -2,7 +2,8 @@ import os
 import torch
 import torch.nn as nn
 import torch.quantization
-from torchvision import models, transforms
+from torchvision.models.quantization import resnet18 as qresnet18 
+from torchvision import transforms
 from torch.utils.data import Dataset, DataLoader
 import cv2
 import numpy as np
@@ -15,38 +16,42 @@ warnings.filterwarnings("ignore")
 # ==========================================
 # ⚙️ CONFIGURATION
 # ==========================================
-# Ganti path ini sesuai lokasi model training terbaik Anda
 INPUT_MODEL_PATH = "Computer-Vision/models_output_lstm/best_vision_lstm.pth"
-VIDEO_DIR = "dataset_video" # Folder dataset untuk kalibrasi
+VIDEO_DIR = "../dataset_video"
 OUTPUT_DIR = "Computer-Vision/models_output_lstm"
 QUANTIZED_MODEL_PATH = os.path.join(OUTPUT_DIR, "vision_model_quantized.pth")
 
 SEQUENCE_LENGTH = 20
 IMG_SIZE = 224
 BATCH_SIZE = 4 
-
-# Quantization wajib di CPU
 DEVICE = "cpu"
 
 # ==========================================
-# 1. MODEL DEFINITION (Modified for Quantization)
+# 1. MODEL DEFINITION
 # ==========================================
 class QuantizedCNNLSTM(nn.Module):
     def __init__(self, num_classes=3):
         super(QuantizedCNNLSTM, self).__init__()
         
-        # [PENTING] Gerbang Quantization
-        self.quant = torch.quantization.QuantStub()   # Input: Float -> Int
-        self.dequant = torch.quantization.DeQuantStub() # Output: Int -> Float
+        self.quant = torch.quantization.QuantStub()
+        self.dequant = torch.quantization.DeQuantStub()
         
-        # A. CNN Backbone (ResNet18)
-        resnet = models.resnet18(weights=None) 
-        self.cnn = nn.Sequential(*list(resnet.children())[:-1])
+        resnet = qresnet18(weights=None, quantize=False) 
         
-        # B. LSTM 
+        self.cnn = nn.Sequential(
+            resnet.conv1,
+            resnet.bn1,
+            resnet.relu,
+            resnet.maxpool,
+            resnet.layer1,
+            resnet.layer2,
+            resnet.layer3,
+            resnet.layer4,
+            resnet.avgpool
+        )
+        
         self.lstm = nn.LSTM(input_size=512, hidden_size=128, num_layers=1, batch_first=True)
         
-        # C. Classifier
         self.fc = nn.Sequential(
             nn.Linear(128, 64),
             nn.ReLU(),
@@ -55,39 +60,30 @@ class QuantizedCNNLSTM(nn.Module):
         )
 
     def forward(self, x):
-        # 1. Masuk Gerbang Quantization (Float -> Int8)
         x = self.quant(x)
         
-        # 2. CNN Processing
         batch_size, seq_len, c, h, w = x.size()
         c_in = x.view(batch_size * seq_len, c, h, w)
         
-        c_out = self.cnn(c_in)
+        c_out = self.cnn(c_in) 
         c_out = c_out.view(batch_size, seq_len, -1)
         
-        # 3. LSTM Processing
-        # (PyTorch akan otomatis handle quantisasi di dalam LSTM jika backend support)
         lstm_out, (h_n, c_n) = self.lstm(c_out)
-        
-        # 4. Classifier
         out = self.fc(h_n[-1])
         
-        # 5. Keluar Gerbang (Int8 -> Float) untuk hasil prediksi
         out = self.dequant(out)
         return out
 
 # ==========================================
-# 2. CALIBRATION DATASET
+# 2. DATASET & UTILS
 # ==========================================
-# Kita butuh sampel data asli agar model tahu range pixel video
 class CalibrationDataset(Dataset):
     def __init__(self, video_dir):
         self.video_paths = []
-        # Ambil sampel video (maksimal 20 video biar proses cepat)
         count = 0
         for root, _, files in os.walk(video_dir):
             for file in files:
-                if file.endswith('.mp4') and count < 20:
+                if file.endswith(('.mp4', '.avi')) and count < 20:
                     self.video_paths.append(os.path.join(root, file))
                     count += 1
         
@@ -104,12 +100,10 @@ class CalibrationDataset(Dataset):
         path = self.video_paths[idx]
         cap = cv2.VideoCapture(path)
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        
         if total_frames > SEQUENCE_LENGTH:
             indices = np.linspace(0, total_frames-1, SEQUENCE_LENGTH).astype(int)
         else:
             indices = np.arange(total_frames)
-            
         frames = []
         current_frame = 0
         while True:
@@ -123,84 +117,115 @@ class CalibrationDataset(Dataset):
                 if len(frames) >= SEQUENCE_LENGTH: break
             current_frame += 1
         cap.release()
-        
-        # Padding
         while len(frames) < SEQUENCE_LENGTH:
             frames.append(torch.zeros(3, IMG_SIZE, IMG_SIZE))
-            
         return torch.stack(frames)
 
 # ==========================================
-# 3. MAIN PROCESS
+# 3. BENCHMARK FUNCTION
+# ==========================================
+def measure_latency(model, dummy_input, name="Model"):
+    print(f"⏳ Testing {name} Speed...")
+    
+    # Warmup
+    with torch.no_grad():
+        model(dummy_input)
+    
+    start = time.time()
+    for _ in range(10): 
+        with torch.no_grad():
+            model(dummy_input)
+    end = time.time()
+    
+    avg_time = (end - start) / 10 * 1000
+    print(f"   ⚡ Latency: {avg_time:.2f} ms")
+    return avg_time
+
+# ==========================================
+# 4. MAIN PROCESS
 # ==========================================
 def main():
-    print(f"📥 Loading CNN-LSTM Model from {INPUT_MODEL_PATH}...")
+    print(f"📥 Loading Original Model...")
     
-    # 1. Init Model Structure
-    model = QuantizedCNNLSTM(num_classes=3)
-    
-    # 2. Load Weights (Strict=False karena kita nambah layer QuantStub)
+    # 1. Load Original Model (Float32)
+    model_orig = QuantizedCNNLSTM(num_classes=3)
     try:
         state_dict = torch.load(INPUT_MODEL_PATH, map_location=DEVICE)
-        model.load_state_dict(state_dict, strict=False)
+        model_orig.load_state_dict(state_dict, strict=False)
+        print("✅ Weights loaded successfully")
     except Exception as e:
         print(f"❌ Error loading weights: {e}")
         return
 
-    model.to(DEVICE)
-    model.eval()
+    model_orig.to(DEVICE)
+    model_orig.eval()
 
-    # 3. Konfigurasi Quantization (Backend: fbgemm untuk Server/Laptop)
-    print("⚙️ Configuring Static Quantization (fbgemm)...")
-    model.qconfig = torch.quantization.get_default_qconfig('fbgemm')
+    # --- BENCHMARK ORIGINAL ---
+    dummy_input = torch.randn(1, SEQUENCE_LENGTH, 3, IMG_SIZE, IMG_SIZE)
+    lat_orig = measure_latency(model_orig, dummy_input, name="Original (Float32)")
+
+    # 2. START QUANTIZATION
+    print("\n⚙️  Starting Quantization Process...")
     
-    # 4. Prepare (Sisipkan observer untuk melihat data)
-    print("🧊 Preparing model...")
-    torch.quantization.prepare(model, inplace=True)
+    # Kita copy modelnya agar yang original tetap utuh untuk perbandingan
+    model_quant = copy.deepcopy(model_orig)
     
-    # 5. Calibrate (Jalankan data sampel)
+    model_quant.qconfig = torch.quantization.get_default_qconfig('fbgemm')
+    torch.quantization.prepare(model_quant, inplace=True)
+    
     print("📏 Calibrating with real video data...")
-    calib_loader = DataLoader(CalibrationDataset(VIDEO_DIR), batch_size=BATCH_SIZE)
+    dataset = CalibrationDataset(VIDEO_DIR)
+    if len(dataset) == 0:
+        print("❌ Error: Tidak ada video di folder dataset_video.")
+        return
+
+    calib_loader = DataLoader(dataset, batch_size=BATCH_SIZE)
     
     with torch.no_grad():
         for i, videos in enumerate(calib_loader):
             print(f"   ↳ Processing batch {i+1}...")
-            model(videos.to(DEVICE))
+            model_quant(videos.to(DEVICE))
             
-    # 6. Convert (Ubah Float32 -> Int8)
     print("🔨 Converting model to INT8...")
-    torch.quantization.convert(model, inplace=True)
+    torch.quantization.convert(model_quant, inplace=True)
     
-    # 7. Save
     print(f"💾 Saving Quantized Model to {QUANTIZED_MODEL_PATH}...")
-    torch.save(model.state_dict(), QUANTIZED_MODEL_PATH)
+    torch.save(model_quant.state_dict(), QUANTIZED_MODEL_PATH)
+
+    # --- BENCHMARK QUANTIZED ---
+    print("\n")
+    lat_quant = measure_latency(model_quant, dummy_input, name="Quantized (Int8)")
 
     # ==========================================
-    # 📊 BENCHMARKING
+    # 📊 FINAL REPORT
     # ==========================================
-    print("\n📊 --- BENCHMARK RESULTS ---")
+    print("\n" + "="*40)
+    print("       🚀 QUANTIZATION REPORT")
+    print("="*40)
     
+    # Size Comparison
     size_orig = os.path.getsize(INPUT_MODEL_PATH) / (1024 * 1024)
     size_quant = os.path.getsize(QUANTIZED_MODEL_PATH) / (1024 * 1024)
-    reduction = (size_orig - size_quant) / size_orig * 100
+    size_reduction = (size_orig - size_quant) / size_orig * 100
     
-    print(f"📦 Original Size : {size_orig:.2f} MB")
-    print(f"📦 Quantized Size: {size_quant:.2f} MB")
-    print(f"🎉 Size Reduction: {reduction:.2f}% lighter!")
+    print(f"📦 STORAGE:")
+    print(f"   - Original  : {size_orig:.2f} MB")
+    print(f"   - Quantized : {size_quant:.2f} MB")
+    print(f"   - Reduction : {size_reduction:.2f}% (lighter)")
     
-    print("\n⏳ Testing Speed (CPU Inference)...")
-    dummy_input = torch.randn(1, SEQUENCE_LENGTH, 3, IMG_SIZE, IMG_SIZE)
+    # Speed Comparison
+    print(f"\n⚡ SPEED (Latency per Video):")
+    print(f"   - Original  : {lat_orig:.2f} ms")
+    print(f"   - Quantized : {lat_quant:.2f} ms")
     
-    # Warmup
-    model(dummy_input)
-    
-    start = time.time()
-    for _ in range(10): 
-        model(dummy_input)
-    end = time.time()
-    
-    avg_time = (end - start) / 10 * 1000
-    print(f"⚡ Quantized Latency: {avg_time:.2f} ms")
+    if lat_quant < lat_orig:
+        speedup = lat_orig / lat_quant
+        print(f"   - Result    : {speedup:.2f}x FASTER! 🚀")
+    else:
+        slowdown = lat_quant / lat_orig
+        print(f"   - Result    : {slowdown:.2f}x Slower (Trade-off for size) 📉")
+        
+    print("="*40)
 
 if __name__ == "__main__":
     main()
