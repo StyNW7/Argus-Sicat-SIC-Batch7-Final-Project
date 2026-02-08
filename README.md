@@ -171,12 +171,26 @@ Clone the GitHub Repository then follow this documentation
 3. python train_mdodel_3.py to train the model.
 4. python test_model.py to test and run the model.
 
+Upgrading the model to T-GCN Model:
+
+1. Change Directory to tgcn folder.
+2. python extract-skeleton.py to get the skeleton-based dataset.
+3. python updated_train_tgcn.py to train the model.
+4. python quantize-tgcn.py to quantize and compressed the model.
+
 ### Speech Recognition Module
 
 1. Change directory to Speech Recognition Module.
 2. python extract_features.py to re-run and get the dataset label. (To run this you should have ffmpeg on your local machine)
 3. python train_and_evaluate_full.py --csv audio_dataset_final.csv --out_dir models_output_final to train and evaluate the model
 4. Run the speech-recog-ai-notebook.ipynb to get the visualization of the evaluation model.
+
+Upgrading the model to Hybrid CNN + LSTM Model:
+
+1. Change Directory to deep-learning-model folder.
+2. python extract-feature.py to get the dataset needed.
+3. python train-dl-model.py to train the model.
+4. python convert-lstm-quantization.py to quantize and compressed the model.
 
 ### FastAPI Server
 
