@@ -23,7 +23,7 @@ Argus is a next-generation AI + IoT proctoring system designed to maintain acade
 It integrates Computer Vision, Speech Recognition, and IoT sensors to detect abnormal user behavior such as whispering, unauthorized talking, suspicious movements, and so on.
 
 Video Demo Link: 
-https://bit.ly/Argus-Sicat-Demo-Video-Stage4 
+[bit.ly/Sicat-Argus-Final-Video](https://bit.ly/Sicat-Argus-Final-Video)
 
 ---
 
