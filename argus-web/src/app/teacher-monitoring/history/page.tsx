@@ -70,7 +70,7 @@ export default function TeacherDashboard() {
   const eventsPerPage = 50;
 
   const [dateRange, setDateRange] = useState<{ start: string; end: string }>({
-    start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    start: new Date(Date.now() - 300 * 24 * 60 * 60 * 1000)
       .toISOString()
       .split("T")[0],
     end: new Date().toISOString().split("T")[0],
