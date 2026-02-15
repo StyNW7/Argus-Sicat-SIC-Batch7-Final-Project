@@ -25,7 +25,7 @@ It integrates Computer Vision, Speech Recognition, and IoT sensors to detect abn
 Video Demo Link: 
 [bit.ly/Sicat-Argus-Final-Video](https://bit.ly/Sicat-Argus-Final-Video)
 
----
+--- 
 
 ## ⚙️ Technology Stack
 
