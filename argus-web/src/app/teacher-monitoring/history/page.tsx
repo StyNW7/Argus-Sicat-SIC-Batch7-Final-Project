@@ -30,98 +30,105 @@ import {
 // Types
 interface AIEvent {
   id: string;
-  event_type: 'audio' | 'vision';
+  device_id: string;
+  event_type: "audio" | "vision";
   label: string;
   confidence?: number;
   created_at: string;
-  student_id?: string;
-  student_name?: string;
-  exam_id?: string;
-  exam_name?: string;
-  metadata?: any;
+  timestamp?: number;
+  file_path?: string;
 }
 
-interface ExamSummary {
+interface ClassSummary {
   id: string;
+  code: string;
   name: string;
-  student_count: number;
   event_count: number;
   suspicious_count: number;
-  start_time: string;
-  end_time: string;
+  created_at: string;
 }
+
+// Helper function to normalize confidence from 0-100 to 0-1
+const normalizeConfidence = (confidence?: number): number => {
+  if (!confidence && confidence !== 0) return 0;
+  if (confidence > 1) return confidence / 100;
+  return confidence;
+};
 
 export default function TeacherDashboard() {
   const router = useRouter();
-  
+
   // State
   const [events, setEvents] = useState<AIEvent[]>([]);
-  const [exams, setExams] = useState<ExamSummary[]>([]);
+  const [classes, setClasses] = useState<ClassSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedExam, setSelectedExam] = useState<string>('all');
-  const [selectedType, setSelectedType] = useState<string>('all');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedClass, setSelectedClass] = useState<string>("all");
+  const [selectedType, setSelectedType] = useState<string>("all");
+  const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const eventsPerPage = 50;
-  
+
   const [dateRange, setDateRange] = useState<{ start: string; end: string }>({
-    start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    end: new Date().toISOString().split('T')[0]
+    start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split("T")[0],
+    end: new Date().toISOString().split("T")[0],
   });
-  
+
   const [stats, setStats] = useState({
     totalEvents: 0,
     audioEvents: 0,
     visionEvents: 0,
     suspiciousEvents: 0,
-    recentSuspicious: 0
+    recentSuspicious: 0,
   });
 
-  // Fetch data
+  // Fetch data - only refetch when needed
   useEffect(() => {
     fetchData();
-  }, [selectedExam, selectedType, dateRange]);
+  }, []);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Fetch AI events
-      let query = supabase
-        .from('ai_events')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // Fetch ALL AI events (no filters at DB level)
+      const { data: allEventsData, error: allEventsError } = await supabase
+        .from("ai_events")
+        .select("*")
+        .order("created_at", { ascending: false });
 
-      // Apply filters
-      if (selectedExam !== 'all') {
-        query = query.eq('exam_id', selectedExam);
-      }
-      if (selectedType !== 'all') {
-        query = query.eq('event_type', selectedType);
-      }
-      if (dateRange.start) {
-        query = query.gte('created_at', `${dateRange.start}T00:00:00Z`);
-      }
-      if (dateRange.end) {
-        query = query.lte('created_at', `${dateRange.end}T23:59:59Z`);
-      }
+      if (allEventsError) throw allEventsError;
 
-      const { data: eventsData, error: eventsError } = await query;
+      // Store all events - filtering will be done client-side
+      setEvents(allEventsData || []);
 
-      if (eventsError) throw eventsError;
-      setEvents(eventsData || []);
-
-      // Calculate stats from the fetched events
-      const allEvents = eventsData || [];
-      const audioEvents = allEvents.filter(e => e.event_type === 'audio').length;
-      const visionEvents = allEvents.filter(e => e.event_type === 'vision').length;
-      const suspiciousLabels = ['cheating', 'multiple_faces', 'looking_away', 'whispering', 'normal_conversation'];
-      const suspiciousEvents = allEvents.filter(e => suspiciousLabels.includes(e.label)).length;
+      // Calculate stats from ALL events
+      const allEvents = allEventsData || [];
+      const audioEvents = allEvents.filter(
+        (e) => e.event_type === "audio",
+      ).length;
+      const visionEvents = allEvents.filter(
+        (e) => e.event_type === "vision",
+      ).length;
+      const suspiciousLabels = [
+        "cheating",
+        "multiple_faces",
+        "looking_away",
+        "whispering",
+        "normal_conversation",
+      ];
+      const suspiciousEvents = allEvents.filter((e) =>
+        suspiciousLabels.includes(e.label),
+      ).length;
 
       // Recent suspicious events (last 24 hours)
-      const recentCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      const recentSuspicious = allEvents.filter(e => 
-        suspiciousLabels.includes(e.label) && e.created_at >= recentCutoff
+      const recentCutoff = new Date(
+        Date.now() - 24 * 60 * 60 * 1000,
+      ).toISOString();
+      const recentSuspicious = allEvents.filter(
+        (e) =>
+          suspiciousLabels.includes(e.label) && e.created_at >= recentCutoff,
       ).length;
 
       setStats({
@@ -129,67 +136,71 @@ export default function TeacherDashboard() {
         audioEvents,
         visionEvents,
         suspiciousEvents,
-        recentSuspicious
+        recentSuspicious,
       });
 
-      // Fetch exams summary
-      const { data: examsData, error: examsError } = await supabase
-        .from('exams')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // Fetch classes summary
+      const { data: classesData, error: classesError } = await supabase
+        .from("classes")
+        .select("*")
+        .order("created_at", { ascending: false });
 
-      if (examsError) throw examsError;
-      
-      // For each exam, count events
-      const examsWithStats = await Promise.all(
-        (examsData || []).map(async (exam) => {
+      if (classesError) throw classesError;
+
+      // For each class, count events
+      const classesWithStats = await Promise.all(
+        (classesData || []).map(async (classItem) => {
           const { count: eventCount } = await supabase
-            .from('ai_events')
-            .select('*', { count: 'exact', head: true })
-            .eq('exam_id', exam.id);
+            .from("ai_events")
+            .select("*", { count: "exact", head: true });
 
           const { count: suspiciousCount } = await supabase
-            .from('ai_events')
-            .select('*', { count: 'exact', head: true })
-            .eq('exam_id', exam.id)
-            .in('label', suspiciousLabels);
-
-          // Get unique students count
-          const { data: studentsData } = await supabase
-            .from('ai_events')
-            .select('student_id')
-            .eq('exam_id', exam.id);
-
-          const uniqueStudents = new Set(studentsData?.map(s => s.student_id) || []);
+            .from("ai_events")
+            .select("*", { count: "exact", head: true })
+            .in("label", suspiciousLabels);
 
           return {
-            id: exam.id,
-            name: exam.name || `Exam ${exam.id.slice(0, 8)}`,
-            student_count: uniqueStudents.size,
+            id: classItem.id,
+            code: classItem.code || "",
+            name: classItem.name || `Class ${classItem.code}`,
             event_count: eventCount || 0,
             suspicious_count: suspiciousCount || 0,
-            start_time: exam.start_time || exam.created_at,
-            end_time: exam.end_time || exam.created_at
+            created_at: classItem.created_at,
           };
-        })
+        }),
       );
 
-      setExams(examsWithStats);
-
+      setClasses(classesWithStats);
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error("Error fetching data:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  // Filter events based on search
-  const filteredEvents = events.filter(event => {
+  // Filter events based on type, date range, and search
+  const filteredEvents = events.filter((event) => {
+    // Apply event type filter
+    if (selectedType !== "all" && event.event_type !== selectedType)
+      return false;
+
+    // Apply date range filter
+    if (dateRange.start || dateRange.end) {
+      const eventDate = new Date(event.created_at);
+      if (
+        dateRange.start &&
+        eventDate < new Date(`${dateRange.start}T00:00:00Z`)
+      )
+        return false;
+      if (dateRange.end && eventDate > new Date(`${dateRange.end}T23:59:59Z`))
+        return false;
+    }
+
+    // Apply search term filter
     if (!searchTerm) return true;
     const searchLower = searchTerm.toLowerCase();
     return (
-      event.student_name?.toLowerCase().includes(searchLower) ||
-      event.exam_name?.toLowerCase().includes(searchLower) ||
+      event.device_id?.toLowerCase().includes(searchLower) ||
       event.label.toLowerCase().includes(searchLower) ||
       event.event_type.toLowerCase().includes(searchLower)
     );
@@ -203,50 +214,55 @@ export default function TeacherDashboard() {
 
   // Get label color and icon
   const getEventConfig = (event: AIEvent) => {
-    const isSuspicious = ['cheating', 'multiple_faces', 'looking_away', 'whispering', 'normal_conversation']
-      .includes(event.label);
+    const isSuspicious = [
+      "cheating",
+      "multiple_faces",
+      "looking_away",
+      "whispering",
+      "normal_conversation",
+    ].includes(event.label);
 
     const config = {
-      color: '',
-      bgColor: '',
+      color: "",
+      bgColor: "",
       icon: null as React.ReactNode,
-      textColor: ''
+      textColor: "",
     };
 
-    if (event.event_type === 'audio') {
+    if (event.event_type === "audio") {
       config.icon = <Volume2 size={16} />;
-      if (event.label === 'whispering') {
-        config.color = 'bg-orange-500';
-        config.bgColor = 'bg-orange-50';
-        config.textColor = 'text-orange-700';
-      } else if (event.label === 'normal_conversation') {
-        config.color = 'bg-red-500';
-        config.bgColor = 'bg-red-50';
-        config.textColor = 'text-red-700';
+      if (event.label === "whispering") {
+        config.color = "bg-orange-500";
+        config.bgColor = "bg-orange-50";
+        config.textColor = "text-orange-700";
+      } else if (event.label === "normal_conversation") {
+        config.color = "bg-red-500";
+        config.bgColor = "bg-red-50";
+        config.textColor = "text-red-700";
       } else {
-        config.color = 'bg-blue-500';
-        config.bgColor = 'bg-blue-50';
-        config.textColor = 'text-blue-700';
+        config.color = "bg-blue-500";
+        config.bgColor = "bg-blue-50";
+        config.textColor = "text-blue-700";
       }
     } else {
       config.icon = <Eye size={16} />;
-      if (event.label === 'cheating') {
-        config.color = 'bg-red-500';
-        config.bgColor = 'bg-red-50';
-        config.textColor = 'text-red-700';
-      } else if (['multiple_faces', 'looking_away'].includes(event.label)) {
-        config.color = 'bg-orange-500';
-        config.bgColor = 'bg-orange-50';
-        config.textColor = 'text-orange-700';
+      if (event.label === "cheating") {
+        config.color = "bg-red-500";
+        config.bgColor = "bg-red-50";
+        config.textColor = "text-red-700";
+      } else if (["multiple_faces", "looking_away"].includes(event.label)) {
+        config.color = "bg-orange-500";
+        config.bgColor = "bg-orange-50";
+        config.textColor = "text-orange-700";
       } else {
-        config.color = 'bg-green-500';
-        config.bgColor = 'bg-green-50';
-        config.textColor = 'text-green-700';
+        config.color = "bg-green-500";
+        config.bgColor = "bg-green-50";
+        config.textColor = "text-green-700";
       }
     }
 
     if (isSuspicious) {
-      config.bgColor = 'bg-red-50';
+      config.bgColor = "bg-red-50";
     }
 
     return config;
@@ -255,32 +271,44 @@ export default function TeacherDashboard() {
   // Format date
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
   // Export data
   const exportData = () => {
     const csvContent = [
-      ['Event ID', 'Type', 'Label', 'Student', 'Exam', 'Timestamp', 'Confidence'].join(','),
-      ...filteredEvents.map(event => [
-        event.id,
-        event.event_type,
-        event.label,
-        event.student_name || 'N/A',
-        event.exam_name || 'N/A',
-        event.created_at,
-        event.confidence || 'N/A'
-      ].join(','))
-    ].join('\n');
+      [
+        "Event ID",
+        "Type",
+        "Label",
+        "Student",
+        "Exam",
+        "Timestamp",
+        "Confidence",
+      ].join(","),
+      ...filteredEvents.map((event) =>
+        [
+          event.id,
+          event.event_type,
+          event.label,
+          event.device_id || "N/A",
+          "N/A",
+          event.created_at,
+          event.confidence
+            ? `${(normalizeConfidence(event.confidence) * 100).toFixed(1)}%`
+            : "N/A",
+        ].join(","),
+      ),
+    ].join("\n");
 
-    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const blob = new Blob([csvContent], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
     a.download = `argus-events-${new Date().toISOString().slice(0, 10)}.csv`;
     document.body.appendChild(a);
@@ -291,20 +319,22 @@ export default function TeacherDashboard() {
 
   // Reset filters
   const resetFilters = () => {
-    setSelectedExam('all');
-    setSelectedType('all');
-    setSearchTerm('');
+    setSelectedClass("all");
+    setSelectedType("all");
+    setSearchTerm("");
     setCurrentPage(1);
     setDateRange({
-      start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      end: new Date().toISOString().split('T')[0]
+      start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .split("T")[0],
+      end: new Date().toISOString().split("T")[0],
     });
   };
 
   // Pagination handlers
   const goToPage = (page: number) => {
     setCurrentPage(page);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const renderPaginationButtons = () => {
@@ -324,12 +354,12 @@ export default function TeacherDashboard() {
           onClick={() => goToPage(i)}
           className={`px-4 py-2 text-sm rounded-lg transition-colors ${
             currentPage === i
-              ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-medium'
-              : 'border border-gray-200 hover:bg-gray-50 text-gray-700'
+              ? "bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-medium"
+              : "border border-gray-200 hover:bg-gray-50 text-gray-700"
           }`}
         >
           {i}
-        </button>
+        </button>,
       );
     }
 
@@ -339,7 +369,9 @@ export default function TeacherDashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white font-sans flex">
       {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
+      >
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
@@ -363,27 +395,25 @@ export default function TeacherDashboard() {
           {/* Navigation */}
           <nav className="flex-1 p-4 space-y-1">
             <button
-              onClick={() => router.push('/teacher-monitoring/home')}
+              onClick={() => router.push("/teacher-monitoring/home")}
               className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
             >
               <Home size={20} />
               <span className="font-medium">Dashboard</span>
             </button>
-            <button
-              className="w-full flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl shadow-sm"
-            >
+            <button className="w-full flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl shadow-sm">
               <BarChart3 size={20} />
               <span className="font-medium">Monitoring History</span>
             </button>
             <button
-              onClick={() => router.push('/teacher-monitoring')}
+              onClick={() => router.push("/teacher-monitoring")}
               className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
             >
               <ClipboardList size={20} />
               <span className="font-medium">Classes</span>
             </button>
             <button
-              onClick={() => router.push('/teacher-monitoring/visualization')}
+              onClick={() => router.push("/teacher-monitoring/visualization")}
               className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
             >
               <FileText size={20} />
@@ -394,14 +424,14 @@ export default function TeacherDashboard() {
           {/* Bottom Section */}
           <div className="p-4 border-t border-gray-200 space-y-1">
             <button
-              onClick={() => router.push('/settings')}
+              onClick={() => router.push("/settings")}
               className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
             >
               <Settings size={20} />
               <span className="font-medium">Settings</span>
             </button>
             <button
-              onClick={() => router.push('/logout')}
+              onClick={() => router.push("/logout")}
               className="w-full flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50 rounded-xl transition-colors"
             >
               <LogOut size={20} />
@@ -433,8 +463,12 @@ export default function TeacherDashboard() {
                   <Menu size={24} />
                 </button>
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-900">Monitoring History</h1>
-                  <p className="text-gray-600 text-sm mt-1">AI-powered exam integrity monitoring</p>
+                  <h1 className="text-2xl font-bold text-gray-900">
+                    Monitoring History
+                  </h1>
+                  <p className="text-gray-600 text-sm mt-1">
+                    AI-powered exam integrity monitoring
+                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -464,23 +498,31 @@ export default function TeacherDashboard() {
             <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-gray-500 font-medium">Total Events</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{stats.totalEvents.toLocaleString()}</p>
+                  <p className="text-xs text-gray-500 font-medium">
+                    Total Events
+                  </p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">
+                    {stats.totalEvents.toLocaleString()}
+                  </p>
                 </div>
                 <div className="p-2.5 bg-blue-50 rounded-lg">
                   <BarChart3 className="w-5 h-5 text-blue-500" />
                 </div>
               </div>
               <div className="mt-3 pt-3 border-t border-gray-100">
-                <p className="text-xs text-gray-500">Across all exams</p>
+                <p className="text-xs text-gray-500">Across all classes</p>
               </div>
             </div>
 
             <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-gray-500 font-medium">Audio Events</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{stats.audioEvents.toLocaleString()}</p>
+                  <p className="text-xs text-gray-500 font-medium">
+                    Audio Events
+                  </p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">
+                    {stats.audioEvents.toLocaleString()}
+                  </p>
                 </div>
                 <div className="p-2.5 bg-cyan-50 rounded-lg">
                   <Volume2 className="w-5 h-5 text-cyan-500" />
@@ -494,8 +536,12 @@ export default function TeacherDashboard() {
             <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-gray-500 font-medium">Vision Events</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{stats.visionEvents.toLocaleString()}</p>
+                  <p className="text-xs text-gray-500 font-medium">
+                    Vision Events
+                  </p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">
+                    {stats.visionEvents.toLocaleString()}
+                  </p>
                 </div>
                 <div className="p-2.5 bg-purple-50 rounded-lg">
                   <Eye className="w-5 h-5 text-purple-500" />
@@ -509,8 +555,12 @@ export default function TeacherDashboard() {
             <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-gray-500 font-medium">Suspicious</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{stats.suspiciousEvents.toLocaleString()}</p>
+                  <p className="text-xs text-gray-500 font-medium">
+                    Suspicious
+                  </p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">
+                    {stats.suspiciousEvents.toLocaleString()}
+                  </p>
                 </div>
                 <div className="p-2.5 bg-red-50 rounded-lg">
                   <AlertCircle className="w-5 h-5 text-red-500" />
@@ -559,27 +609,39 @@ export default function TeacherDashboard() {
 
               {/* Filter Row */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Exam Filter */}
+                {/* Class Filter */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Exam Filter
+                    Class Filter
                   </label>
                   <div className="relative">
                     <select
-                      value={selectedExam}
-                      onChange={(e) => setSelectedExam(e.target.value)}
+                      value={selectedClass}
+                      onChange={(e) => setSelectedClass(e.target.value)}
                       className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm bg-white appearance-none pr-10"
                     >
-                      <option value="all">All Exams</option>
-                      {exams.map((exam) => (
-                        <option key={exam.id} value={exam.id}>
-                          {exam.name.length > 40 ? exam.name.substring(0, 40) + '...' : exam.name}
+                      <option value="all">All Classes</option>
+                      {classes.map((classItem) => (
+                        <option key={classItem.id} value={classItem.id}>
+                          {classItem.name.length > 40
+                            ? classItem.name.substring(0, 40) + "..."
+                            : classItem.name}
                         </option>
                       ))}
                     </select>
                     <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      <svg
+                        className="w-4 h-4 text-gray-400"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 9l-7 7-7-7"
+                        />
                       </svg>
                     </div>
                   </div>
@@ -601,8 +663,18 @@ export default function TeacherDashboard() {
                       <option value="vision">Vision Events</option>
                     </select>
                     <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      <svg
+                        className="w-4 h-4 text-gray-400"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 9l-7 7-7-7"
+                        />
                       </svg>
                     </div>
                   </div>
@@ -619,7 +691,12 @@ export default function TeacherDashboard() {
                       <input
                         type="date"
                         value={dateRange.start}
-                        onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                        onChange={(e) =>
+                          setDateRange((prev) => ({
+                            ...prev,
+                            start: e.target.value,
+                          }))
+                        }
                         className="w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
                       />
                     </div>
@@ -628,7 +705,12 @@ export default function TeacherDashboard() {
                       <input
                         type="date"
                         value={dateRange.end}
-                        onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                        onChange={(e) =>
+                          setDateRange((prev) => ({
+                            ...prev,
+                            end: e.target.value,
+                          }))
+                        }
                         className="w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
                       />
                     </div>
@@ -656,33 +738,46 @@ export default function TeacherDashboard() {
             </div>
           </div>
 
-          {/* Exams Summary */}
-          {exams.length > 0 && (
+          {/* Classes Summary */}
+          {classes.length > 0 && (
             <div className="mb-8">
-              <h2 className="text-lg font-bold text-gray-900 mb-4">Recent Exams</h2>
+              <h2 className="text-lg font-bold text-gray-900 mb-4">
+                Recent Classes
+              </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {exams.slice(0, 4).map((exam) => (
-                  <div key={exam.id} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-all">
+                {classes.slice(0, 4).map((classItem) => (
+                  <div
+                    key={classItem.id}
+                    className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-all"
+                  >
                     <div className="flex justify-between items-start mb-3">
-                      <h3 className="font-semibold text-gray-900 text-sm truncate flex-1 pr-2">{exam.name}</h3>
+                      <h3 className="font-semibold text-gray-900 text-sm truncate flex-1 pr-2">
+                        {classItem.name}
+                      </h3>
                       <span className="text-xs px-2 py-1 bg-blue-100 text-blue-600 rounded-full whitespace-nowrap">
-                        {exam.student_count} students
+                        {classItem.event_count} events
                       </span>
                     </div>
                     <div className="space-y-2">
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-gray-500">Events</span>
-                        <span className="font-medium text-sm">{exam.event_count}</span>
+                        <span className="font-medium text-sm">
+                          {classItem.event_count}
+                        </span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-xs text-gray-500">Suspicious</span>
-                        <span className={`font-medium text-sm ${exam.suspicious_count > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                          {exam.suspicious_count}
+                        <span className="text-xs text-gray-500">
+                          Suspicious
+                        </span>
+                        <span
+                          className={`font-medium text-sm ${classItem.suspicious_count > 0 ? "text-red-600" : "text-green-600"}`}
+                        >
+                          {classItem.suspicious_count}
                         </span>
                       </div>
                       <div className="pt-3 border-t border-gray-100">
                         <button
-                          onClick={() => setSelectedExam(exam.id)}
+                          onClick={() => setSelectedClass(classItem.id)}
                           className="w-full text-center text-xs text-blue-600 hover:text-blue-700 font-medium py-1.5 hover:bg-blue-50 rounded-lg transition-colors"
                         >
                           View Details
@@ -700,10 +795,14 @@ export default function TeacherDashboard() {
             <div className="px-5 py-4 border-b border-gray-100">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                 <div>
-                  <h2 className="text-lg font-bold text-gray-900">Monitoring Events</h2>
+                  <h2 className="text-lg font-bold text-gray-900">
+                    Monitoring Events
+                  </h2>
                   <p className="text-gray-600 text-xs sm:text-sm mt-1">
-                    Showing {startIndex + 1}-{Math.min(endIndex, filteredEvents.length)} of {filteredEvents.length} events
-                    {selectedExam !== 'all' && ' for selected exam'}
+                    Showing {startIndex + 1}-
+                    {Math.min(endIndex, filteredEvents.length)} of{" "}
+                    {filteredEvents.length} events
+                    {selectedClass !== "all" && " for selected class"}
                   </p>
                 </div>
                 <div className="text-xs sm:text-sm text-gray-500 bg-gray-50 px-3 py-1.5 rounded-lg">
@@ -722,12 +821,13 @@ export default function TeacherDashboard() {
                 <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Eye className="w-8 h-8 text-gray-400" />
                 </div>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No events found</h3>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  No events found
+                </h3>
                 <p className="text-gray-500 max-w-md mx-auto text-sm">
-                  {events.length === 0 
+                  {events.length === 0
                     ? "No monitoring events have been recorded yet. Start an exam to see events here."
-                    : "No events match your current filters. Try adjusting your search or filters."
-                  }
+                    : "No events match your current filters. Try adjusting your search or filters."}
                 </p>
                 {events.length > 0 && (
                   <button
@@ -748,17 +848,14 @@ export default function TeacherDashboard() {
                           Event
                         </th>
                         <th className="text-left py-3 px-4 text-xs font-semibold text-gray-700 uppercase tracking-wider whitespace-nowrap">
-                          Student
+                          Device ID
                         </th>
                         <th className="text-left py-3 px-4 text-xs font-semibold text-gray-700 uppercase tracking-wider whitespace-nowrap">
-                          Exam
+                          Confidence
                         </th>
                         <th className="text-left py-3 px-4 text-xs font-semibold text-gray-700 uppercase tracking-wider whitespace-nowrap">
                           Timestamp
                         </th>
-                        {/* <th className="text-left py-3 px-4 text-xs font-semibold text-gray-700 uppercase tracking-wider whitespace-nowrap">
-                          Confidence
-                        </th> */}
                         <th className="text-left py-3 px-4 text-xs font-semibold text-gray-700 uppercase tracking-wider whitespace-nowrap">
                           Actions
                         </th>
@@ -767,88 +864,108 @@ export default function TeacherDashboard() {
                     <tbody className="divide-y divide-gray-100">
                       {currentEvents.map((event) => {
                         const config = getEventConfig(event);
-                        const isSuspicious = ['cheating', 'multiple_faces', 'looking_away', 'whispering', 'normal_conversation']
-                          .includes(event.label);
+                        const isSuspicious = [
+                          "cheating",
+                          "multiple_faces",
+                          "looking_away",
+                          "whispering",
+                          "normal_conversation",
+                        ].includes(event.label);
 
                         return (
-                          <tr 
-                            key={event.id} 
-                            className={`hover:bg-gray-50 transition-colors ${isSuspicious ? 'bg-red-50/30' : ''}`}
+                          <tr
+                            key={event.id}
+                            className={`hover:bg-gray-50 transition-colors ${isSuspicious ? "bg-red-50/30" : ""}`}
                           >
                             <td className="py-3 px-4">
                               <div className="flex items-center gap-2">
-                                <div className={`p-1.5 rounded-lg ${config.bgColor} flex-shrink-0`}>
+                                <div
+                                  className={`p-1.5 rounded-lg ${config.bgColor} flex-shrink-0`}
+                                >
                                   {config.icon}
                                 </div>
                                 <div className="min-w-0">
                                   <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${config.bgColor} ${config.textColor} whitespace-nowrap`}>
+                                    <span
+                                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${config.bgColor} ${config.textColor} whitespace-nowrap`}
+                                    >
                                       {event.event_type.toUpperCase()}
                                     </span>
                                     {isSuspicious && (
                                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 whitespace-nowrap">
-                                        <AlertCircle size={10} className="mr-1" />
+                                        <AlertCircle
+                                          size={10}
+                                          className="mr-1"
+                                        />
                                         Suspicious
                                       </span>
                                     )}
                                   </div>
                                   <p className="font-medium text-gray-900 text-sm mt-1 truncate capitalize">
-                                    {event.label.replace(/_/g, ' ')}
+                                    {event.label.replace(/_/g, " ")}
                                   </p>
                                 </div>
                               </div>
                             </td>
                             <td className="py-3 px-4">
                               <p className="font-medium text-gray-900 text-sm truncate max-w-[150px]">
-                                {event.student_name || 'Visella'}
+                                {event.device_id || "Unknown Device"}
                               </p>
-                              {event.student_id && (
-                                <p className="text-xs text-gray-500 truncate max-w-[150px]">{event.student_id}</p>
-                              )}
                             </td>
                             <td className="py-3 px-4">
-                              <p className="font-medium text-gray-900 text-sm truncate max-w-[150px]">
-                                {event.exam_name || 'Java Programming'}
-                              </p>
-                            </td>
-                            <td className="py-3 px-4 whitespace-nowrap">
-                              <div className="flex items-center gap-1.5">
-                                <Clock size={12} className="text-gray-400 flex-shrink-0" />
-                                <span className="text-gray-700 text-sm">{formatDate(event.created_at)}</span>
-                              </div>
-                              <p className="text-xs text-gray-500 mt-0.5">
-                                {new Date(event.created_at).toLocaleDateString('en-US', {
-                                  weekday: 'short',
-                                  month: 'short',
-                                  day: 'numeric'
-                                })}
-                              </p>
-                            </td>
-
-                            {/* <td className="py-3 px-4">
-                              {event.confidence ? (
+                              {event.confidence !== undefined &&
+                              event.confidence !== null ? (
                                 <div>
                                   <div className="flex items-center gap-1.5">
                                     <div className="w-16 bg-gray-100 rounded-full h-1.5 flex-shrink-0">
-                                      <div 
-                                        className={`h-1.5 rounded-full ${(typeof event.confidence === 'number' ? event.confidence : parseFloat(event.confidence as string)) > 0.7 ? 'bg-green-500' : 'bg-orange-500'}`}
-                                        style={{ width: `${(typeof event.confidence === 'number' ? event.confidence : parseFloat(event.confidence as string)) * 100}%` }}
+                                      <div
+                                        className={`h-1.5 rounded-full ${normalizeConfidence(event.confidence) > 0.7 ? "bg-green-500" : "bg-orange-500"}`}
+                                        style={{
+                                          width: `${Math.min(100, normalizeConfidence(event.confidence) * 100)}%`,
+                                        }}
                                       ></div>
                                     </div>
                                     <span className="text-xs font-medium text-gray-700 whitespace-nowrap">
-                                      {((typeof event.confidence === 'number' ? event.confidence : parseFloat(event.confidence as string)) * 100).toFixed(0)}%
+                                      {(
+                                        normalizeConfidence(event.confidence) *
+                                        100
+                                      ).toFixed(0)}
+                                      %
                                     </span>
                                   </div>
                                 </div>
                               ) : (
-                                <span className="text-gray-400 text-xs">N/A</span>
+                                <span className="text-gray-400 text-xs">
+                                  N/A
+                                </span>
                               )}
-                            </td> */}
+                            </td>
+                            <td className="py-3 px-4 whitespace-nowrap">
+                              <div className="flex items-center gap-1.5">
+                                <Clock
+                                  size={12}
+                                  className="text-gray-400 flex-shrink-0"
+                                />
+                                <span className="text-gray-700 text-sm">
+                                  {formatDate(event.created_at)}
+                                </span>
+                              </div>
+                              <p className="text-xs text-gray-500 mt-0.5">
+                                {new Date(event.created_at).toLocaleDateString(
+                                  "en-US",
+                                  {
+                                    weekday: "short",
+                                    month: "short",
+                                    day: "numeric",
+                                  },
+                                )}
+                              </p>
+                            </td>
 
                             <td className="py-3 px-4">
                               <button
                                 onClick={() => {
-                                  if (event.event_type === 'vision') {
+                                  if (event.event_type === "vision") {
                                     router.push(`/vision-detail/${event.id}`);
                                   } else {
                                     router.push(`/audio-detail/${event.id}`);
@@ -871,10 +988,12 @@ export default function TeacherDashboard() {
                 {filteredEvents.length > 0 && (
                   <div className="px-5 py-4 border-t border-gray-100 flex flex-col sm:flex-row justify-between items-center gap-3">
                     <p className="text-xs text-gray-600">
-                      Showing {startIndex + 1} to {Math.min(endIndex, filteredEvents.length)} of {filteredEvents.length} events
+                      Showing {startIndex + 1} to{" "}
+                      {Math.min(endIndex, filteredEvents.length)} of{" "}
+                      {filteredEvents.length} events
                     </p>
                     <div className="flex items-center gap-1.5">
-                      <button 
+                      <button
                         onClick={() => goToPage(currentPage - 1)}
                         disabled={currentPage === 1}
                         className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 whitespace-nowrap"
@@ -882,12 +1001,12 @@ export default function TeacherDashboard() {
                         <ChevronLeft size={14} />
                         Previous
                       </button>
-                      
+
                       <div className="flex items-center gap-1">
                         {renderPaginationButtons()}
                       </div>
-                      
-                      <button 
+
+                      <button
                         onClick={() => goToPage(currentPage + 1)}
                         disabled={currentPage === totalPages}
                         className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 whitespace-nowrap"
@@ -908,12 +1027,17 @@ export default function TeacherDashboard() {
           <div className="px-4 sm:px-6 lg:px-8 py-6">
             <div className="flex flex-col md:flex-row justify-between items-center">
               <div>
-                <h3 className="text-sm font-semibold text-gray-900">Argus Exam Monitor</h3>
-                <p className="text-gray-600 text-xs mt-1">AI-powered exam integrity monitoring system</p>
+                <h3 className="text-sm font-semibold text-gray-900">
+                  Argus Exam Monitor
+                </h3>
+                <p className="text-gray-600 text-xs mt-1">
+                  AI-powered exam integrity monitoring system
+                </p>
               </div>
               <div className="mt-4 md:mt-0">
                 <p className="text-xs text-gray-500">
-                  © {new Date().getFullYear()} Samsung Innovation Campus. All rights reserved.
+                  © {new Date().getFullYear()} Samsung Innovation Campus. All
+                  rights reserved.
                 </p>
               </div>
             </div>

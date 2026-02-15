@@ -56,25 +56,22 @@ import {
 // Types
 interface AIEvent {
   id: string;
-  event_type: 'audio' | 'vision';
+  device_id: string;
+  event_type: "audio" | "vision";
   label: string;
   confidence?: number;
   created_at: string;
-  student_id?: string;
-  student_name?: string;
-  exam_id?: string;
-  exam_name?: string;
-  metadata?: any;
+  timestamp?: number;
+  file_path?: string;
 }
 
-interface ExamSummary {
+interface ClassSummary {
   id: string;
+  code: string;
   name: string;
-  student_count: number;
   event_count: number;
   suspicious_count: number;
-  start_time: string;
-  end_time: string;
+  created_at: string;
 }
 
 interface ChartData {
@@ -83,19 +80,28 @@ interface ChartData {
   color: string;
 }
 
+// Helper function to normalize confidence from 0-100 to 0-1
+const normalizeConfidence = (confidence?: number): number => {
+  if (!confidence && confidence !== 0) return 0;
+  if (confidence > 1) return confidence / 100;
+  return confidence;
+};
+
 export default function VisualizationDashboard() {
   const router = useRouter();
-  
+
   // State
   const [events, setEvents] = useState<AIEvent[]>([]);
-  const [exams, setExams] = useState<ExamSummary[]>([]);
+  const [classes, setClasses] = useState<ClassSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedExam, setSelectedExam] = useState<string>('all');
+  const [selectedClass, setSelectedClass] = useState<string>("all");
   const [dateRange, setDateRange] = useState<{ start: string; end: string }>({
-    start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    end: new Date().toISOString().split('T')[0]
+    start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split("T")[0],
+    end: new Date().toISOString().split("T")[0],
   });
-  
+
   const [stats, setStats] = useState({
     totalEvents: 0,
     audioEvents: 0,
@@ -103,63 +109,99 @@ export default function VisualizationDashboard() {
     suspiciousEvents: 0,
     recentSuspicious: 0,
     averageConfidence: 0,
-    uniqueStudents: 0
+    uniqueStudents: 0,
   });
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [selectedTimeframe, setSelectedTimeframe] = useState<'24h' | '7d' | '30d' | 'all'>('30d');
+  const [selectedTimeframe, setSelectedTimeframe] = useState<
+    "24h" | "7d" | "30d" | "all"
+  >("30d");
 
   // Fetch data
   useEffect(() => {
     fetchData();
-  }, [selectedExam, dateRange]);
+  }, [dateRange]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Fetch AI events
-      let query = supabase
-        .from('ai_events')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // Fetch ALL AI events for stats (no date filter)
+      const { data: allEventsData, error: allEventsError } = await supabase
+        .from("ai_events")
+        .select("*")
+        .order("created_at", { ascending: false });
 
-      // Apply filters
-      if (selectedExam !== 'all') {
-        query = query.eq('exam_id', selectedExam);
-      }
+      if (allEventsError) throw allEventsError;
+
+      // Fetch filtered AI events for charts
+      let filteredQuery = supabase
+        .from("ai_events")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      // Apply date filters for visualization
       if (dateRange.start) {
-        query = query.gte('created_at', `${dateRange.start}T00:00:00Z`);
+        filteredQuery = filteredQuery.gte(
+          "created_at",
+          `${dateRange.start}T00:00:00Z`,
+        );
       }
       if (dateRange.end) {
-        query = query.lte('created_at', `${dateRange.end}T23:59:59Z`);
+        filteredQuery = filteredQuery.lte(
+          "created_at",
+          `${dateRange.end}T23:59:59Z`,
+        );
       }
 
-      const { data: eventsData, error: eventsError } = await query;
+      const { data: eventsData, error: eventsError } = await filteredQuery;
 
       if (eventsError) throw eventsError;
       setEvents(eventsData || []);
 
-      // Calculate stats from the fetched events
-      const allEvents = eventsData || [];
-      const audioEvents = allEvents.filter(e => e.event_type === 'audio').length;
-      const visionEvents = allEvents.filter(e => e.event_type === 'vision').length;
-      const suspiciousLabels = ['cheating', 'multiple_faces', 'looking_away', 'whispering', 'normal_conversation'];
-      const suspiciousEvents = allEvents.filter(e => suspiciousLabels.includes(e.label)).length;
+      // Calculate stats from ALL events (for accurate totals)
+      const allEvents = allEventsData || [];
+      const audioEvents = allEvents.filter(
+        (e) => e.event_type === "audio",
+      ).length;
+      const visionEvents = allEvents.filter(
+        (e) => e.event_type === "vision",
+      ).length;
+      const suspiciousLabels = [
+        "cheating",
+        "multiple_faces",
+        "looking_away",
+        "whispering",
+        "normal_conversation",
+      ];
+      const suspiciousEvents = allEvents.filter((e) =>
+        suspiciousLabels.includes(e.label),
+      ).length;
 
       // Recent suspicious events (last 24 hours)
-      const recentCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      const recentSuspicious = allEvents.filter(e => 
-        suspiciousLabels.includes(e.label) && e.created_at >= recentCutoff
+      const recentCutoff = new Date(
+        Date.now() - 24 * 60 * 60 * 1000,
+      ).toISOString();
+      const recentSuspicious = allEvents.filter(
+        (e) =>
+          suspiciousLabels.includes(e.label) && e.created_at >= recentCutoff,
       ).length;
 
       // Calculate average confidence
-      const eventsWithConfidence = allEvents.filter(e => e.confidence);
-      const averageConfidence = eventsWithConfidence.length > 0
-        ? eventsWithConfidence.reduce((sum, e) => sum + (typeof e.confidence === 'number' ? e.confidence : parseFloat(e.confidence as string)), 0) / eventsWithConfidence.length
-        : 0;
+      const eventsWithConfidence = allEvents.filter(
+        (e) => e.confidence !== undefined && e.confidence !== null,
+      );
+      const averageConfidence =
+        eventsWithConfidence.length > 0
+          ? eventsWithConfidence.reduce(
+              (sum, e) => sum + normalizeConfidence(e.confidence),
+              0,
+            ) / eventsWithConfidence.length
+          : 0;
 
-      // Get unique students
-      const uniqueStudents = new Set(allEvents.map(e => e.student_id).filter(id => id)).size;
+      // Get unique devices
+      const uniqueDevices = new Set(
+        allEvents.map((e) => e.device_id).filter((id) => id),
+      ).size;
 
       setStats({
         totalEvents: allEvents.length,
@@ -168,55 +210,43 @@ export default function VisualizationDashboard() {
         suspiciousEvents,
         recentSuspicious,
         averageConfidence,
-        uniqueStudents
+        uniqueStudents: uniqueDevices,
       });
 
-      // Fetch exams summary
-      const { data: examsData, error: examsError } = await supabase
-        .from('exams')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // Fetch classes summary
+      const { data: classesData, error: classesError } = await supabase
+        .from("classes")
+        .select("*")
+        .order("created_at", { ascending: false });
 
-      if (examsError) throw examsError;
-      
-      // For each exam, count events
-      const examsWithStats = await Promise.all(
-        (examsData || []).map(async (exam) => {
+      if (classesError) throw classesError;
+
+      // For each class, count events
+      const classesWithStats = await Promise.all(
+        (classesData || []).map(async (classItem) => {
           const { count: eventCount } = await supabase
-            .from('ai_events')
-            .select('*', { count: 'exact', head: true })
-            .eq('exam_id', exam.id);
+            .from("ai_events")
+            .select("*", { count: "exact", head: true });
 
           const { count: suspiciousCount } = await supabase
-            .from('ai_events')
-            .select('*', { count: 'exact', head: true })
-            .eq('exam_id', exam.id)
-            .in('label', suspiciousLabels);
-
-          // Get unique students count
-          const { data: studentsData } = await supabase
-            .from('ai_events')
-            .select('student_id')
-            .eq('exam_id', exam.id);
-
-          const uniqueStudents = new Set(studentsData?.map(s => s.student_id) || []);
+            .from("ai_events")
+            .select("*", { count: "exact", head: true })
+            .in("label", suspiciousLabels);
 
           return {
-            id: exam.id,
-            name: exam.name || `Exam ${exam.id.slice(0, 8)}`,
-            student_count: uniqueStudents.size,
+            id: classItem.id,
+            code: classItem.code || "",
+            name: classItem.name || `Class ${classItem.code}`,
             event_count: eventCount || 0,
             suspicious_count: suspiciousCount || 0,
-            start_time: exam.start_time || exam.created_at,
-            end_time: exam.end_time || exam.created_at
+            created_at: classItem.created_at,
           };
-        })
+        }),
       );
 
-      setExams(examsWithStats);
-
+      setClasses(classesWithStats);
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error("Error fetching data:", error);
     } finally {
       setLoading(false);
     }
@@ -224,77 +254,151 @@ export default function VisualizationDashboard() {
 
   // Chart Data Processing
   const chartData = useMemo(() => {
+    // Count from filtered events for charts to match date range filter
+    const filteredAudioEvents = events.filter(
+      (e) => e.event_type === "audio",
+    ).length;
+    const filteredVisionEvents = events.filter(
+      (e) => e.event_type === "vision",
+    ).length;
+    const suspiciousLabels = [
+      "cheating",
+      "multiple_faces",
+      "looking_away",
+      "whispering",
+      "normal_conversation",
+    ];
+    const filteredSuspiciousEvents = events.filter((e) =>
+      suspiciousLabels.includes(e.label),
+    ).length;
+    const filteredNormalEvents = events.length - filteredSuspiciousEvents;
+
     // Event type distribution
     const eventTypeData = [
-      { name: 'Audio', value: stats.audioEvents, color: '#06b6d4' },
-      { name: 'Vision', value: stats.visionEvents, color: '#8b5cf6' },
+      { name: "Audio", value: filteredAudioEvents, color: "#06b6d4" },
+      { name: "Vision", value: filteredVisionEvents, color: "#8b5cf6" },
     ];
 
     // Suspicious vs Normal events
     const suspiciousData = [
-      { name: 'Normal', value: stats.totalEvents - stats.suspiciousEvents, color: '#10b981' },
-      { name: 'Suspicious', value: stats.suspiciousEvents, color: '#ef4444' },
+      {
+        name: "Normal",
+        value: filteredNormalEvents,
+        color: "#10b981",
+      },
+      { name: "Suspicious", value: filteredSuspiciousEvents, color: "#ef4444" },
     ];
 
     // Event labels distribution
-    const labelCounts = events.reduce((acc, event) => {
-      const label = event.label.replace(/_/g, ' ').toUpperCase();
-      acc[label] = (acc[label] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    const labelCounts = events.reduce(
+      (acc, event) => {
+        const label = event.label.replace(/_/g, " ").toUpperCase();
+        acc[label] = (acc[label] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
 
     const labelData = Object.entries(labelCounts).map(([name, value]) => ({
       name,
       value,
-      color: ['CHEATING', 'WHISPERING', 'NORMAL'].includes(name) 
-        ? '#ef4444' 
-        : ['LOOKING AWAY', 'MULTIPLE FACES'].includes(name)
-        ? '#f97316'
-        : '#10b981'
+      color: ["CHEATING", "WHISPERING", "NORMAL"].includes(name)
+        ? "#ef4444"
+        : ["LOOKING AWAY", "MULTIPLE FACES"].includes(name)
+          ? "#f97316"
+          : "#10b981",
     }));
 
     // Time series data (events by hour of day)
     const hourlyData = Array.from({ length: 24 }, (_, i) => {
       const hour = `${i}:00`;
-      const hourEvents = events.filter(event => {
+      const hourEvents = events.filter((event) => {
         const eventHour = new Date(event.created_at).getHours();
         return eventHour === i;
       });
       return {
         hour,
         total: hourEvents.length,
-        suspicious: hourEvents.filter(e => 
-          ['cheating', 'multiple_faces', 'looking_away', 'whispering', 'normal_conversation'].includes(e.label)
+        suspicious: hourEvents.filter((e) =>
+          [
+            "cheating",
+            "multiple_faces",
+            "looking_away",
+            "whispering",
+            "normal_conversation",
+          ].includes(e.label),
         ).length,
-        normal: hourEvents.filter(e => 
-          !['cheating', 'multiple_faces', 'looking_away', 'whispering', 'normal_conversation'].includes(e.label)
+        normal: hourEvents.filter(
+          (e) =>
+            ![
+              "cheating",
+              "multiple_faces",
+              "looking_away",
+              "whispering",
+              "normal_conversation",
+            ].includes(e.label),
         ).length,
       };
     });
 
     // Events by day of week
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const dailyData = days.map(day => {
-      const dayEvents = events.filter(event => {
+    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const dailyData = days.map((day) => {
+      const dayEvents = events.filter((event) => {
         const eventDay = new Date(event.created_at).getDay();
         return days[eventDay] === day;
       });
       return {
         day,
         total: dayEvents.length,
-        suspicious: dayEvents.filter(e => 
-          ['cheating', 'multiple_faces', 'looking_away', 'whispering', 'normal_conversation'].includes(e.label)
+        suspicious: dayEvents.filter((e) =>
+          [
+            "cheating",
+            "multiple_faces",
+            "looking_away",
+            "whispering",
+            "normal_conversation",
+          ].includes(e.label),
         ).length,
       };
     });
 
     // Confidence distribution
     const confidenceData = [
-      { range: '0-20%', count: events.filter(e => (e.confidence || 0) <= 0.2).length },
-      { range: '21-40%', count: events.filter(e => (e.confidence || 0) > 0.2 && (e.confidence || 0) <= 0.4).length },
-      { range: '41-60%', count: events.filter(e => (e.confidence || 0) > 0.4 && (e.confidence || 0) <= 0.6).length },
-      { range: '61-80%', count: events.filter(e => (e.confidence || 0) > 0.6 && (e.confidence || 0) <= 0.8).length },
-      { range: '81-100%', count: events.filter(e => (e.confidence || 0) > 0.8).length },
+      {
+        range: "0-20%",
+        count: events.filter((e) => normalizeConfidence(e.confidence) <= 0.2)
+          .length,
+      },
+      {
+        range: "21-40%",
+        count: events.filter(
+          (e) =>
+            normalizeConfidence(e.confidence) > 0.2 &&
+            normalizeConfidence(e.confidence) <= 0.4,
+        ).length,
+      },
+      {
+        range: "41-60%",
+        count: events.filter(
+          (e) =>
+            normalizeConfidence(e.confidence) > 0.4 &&
+            normalizeConfidence(e.confidence) <= 0.6,
+        ).length,
+      },
+      {
+        range: "61-80%",
+        count: events.filter(
+          (e) =>
+            normalizeConfidence(e.confidence) > 0.6 &&
+            normalizeConfidence(e.confidence) <= 0.8,
+        ).length,
+      },
+      {
+        range: "81-100%",
+        count: events.filter((e) => normalizeConfidence(e.confidence) > 0.8)
+          .length,
+      },
     ];
 
     return {
@@ -307,31 +411,47 @@ export default function VisualizationDashboard() {
     };
   }, [events, stats]);
 
-  // Top students with most events
-  const topStudents = useMemo(() => {
-    const studentCounts = events.reduce((acc, event) => {
-      const studentName = event.student_name || 'Visella';
-      if (!acc[studentName]) {
-        acc[studentName] = { name: studentName, events: 0, suspicious: 0 };
-      }
-      acc[studentName].events++;
-      if (['cheating', 'multiple_faces', 'looking_away', 'whispering', 'normal_conversation'].includes(event.label)) {
-        acc[studentName].suspicious++;
-      }
-      return acc;
-    }, {} as Record<string, { name: string; events: number; suspicious: number }>);
+  // Top devices with most events
+  const topDevices = useMemo(() => {
+    const deviceCounts = events.reduce(
+      (acc, event) => {
+        const deviceId = event.device_id || "Unknown";
+        if (!acc[deviceId]) {
+          acc[deviceId] = { name: deviceId, events: 0, suspicious: 0 };
+        }
+        acc[deviceId].events++;
+        if (
+          [
+            "cheating",
+            "multiple_faces",
+            "looking_away",
+            "whispering",
+            "normal_conversation",
+          ].includes(event.label)
+        ) {
+          acc[deviceId].suspicious++;
+        }
+        return acc;
+      },
+      {} as Record<
+        string,
+        { name: string; events: number; suspicious: number }
+      >,
+    );
 
-    return Object.values(studentCounts)
+    return Object.values(deviceCounts)
       .sort((a, b) => b.events - a.events)
       .slice(0, 5);
   }, [events]);
 
   // Reset filters
   const resetFilters = () => {
-    setSelectedExam('all');
+    setSelectedClass("all");
     setDateRange({
-      start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      end: new Date().toISOString().split('T')[0]
+      start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .split("T")[0],
+      end: new Date().toISOString().split("T")[0],
     });
   };
 
@@ -360,7 +480,9 @@ export default function VisualizationDashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white font-sans flex">
       {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
+      >
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
@@ -384,28 +506,28 @@ export default function VisualizationDashboard() {
           {/* Navigation */}
           <nav className="flex-1 p-4 space-y-1">
             <button
-              onClick={() => router.push('/teacher-monitoring/home')}
+              onClick={() => router.push("/teacher-monitoring/home")}
               className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
             >
               <Home size={20} />
               <span className="font-medium">Dashboard</span>
             </button>
             <button
-            onClick={() => router.push('/teacher-monitoring/history')}
+              onClick={() => router.push("/teacher-monitoring/history")}
               className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
             >
               <BarChart3 size={20} />
               <span className="font-medium">Monitoring History</span>
             </button>
             <button
-              onClick={() => router.push('/teacher-monitoring')}
+              onClick={() => router.push("/teacher-monitoring")}
               className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
             >
               <ClipboardList size={20} />
               <span className="font-medium">Classes</span>
             </button>
             <button
-              onClick={() => router.push('/teacher-monitoring/visualization')}
+              onClick={() => router.push("/teacher-monitoring/visualization")}
               className="w-full flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl shadow-sm"
             >
               <FileText size={20} />
@@ -416,14 +538,14 @@ export default function VisualizationDashboard() {
           {/* Bottom Section */}
           <div className="p-4 border-t border-gray-200 space-y-1">
             <button
-              onClick={() => router.push('/settings')}
+              onClick={() => router.push("/settings")}
               className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
             >
               <Settings size={20} />
               <span className="font-medium">Settings</span>
             </button>
             <button
-              onClick={() => router.push('/logout')}
+              onClick={() => router.push("/logout")}
               className="w-full flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50 rounded-xl transition-colors"
             >
               <LogOut size={20} />
@@ -455,8 +577,12 @@ export default function VisualizationDashboard() {
                   <Menu size={24} />
                 </button>
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-900">Analytics Dashboard</h1>
-                  <p className="text-gray-600 text-sm mt-1">AI Events Visualization & Insights</p>
+                  <h1 className="text-2xl font-bold text-gray-900">
+                    Analytics Dashboard
+                  </h1>
+                  <p className="text-gray-600 text-sm mt-1">
+                    AI Events Visualization & Insights
+                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -469,7 +595,9 @@ export default function VisualizationDashboard() {
                 </button>
                 <div className="hidden sm:flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg">
                   <Zap size={16} className="text-amber-500" />
-                  <span className="text-sm font-medium text-gray-700">Live Updates</span>
+                  <span className="text-sm font-medium text-gray-700">
+                    Live Updates
+                  </span>
                 </div>
               </div>
             </div>
@@ -484,8 +612,10 @@ export default function VisualizationDashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium opacity-90">Total Events</p>
-                  <p className="text-3xl font-bold mt-2">{stats.totalEvents.toLocaleString()}</p>
-                  <p className="text-xs opacity-80 mt-2">Across all exams</p>
+                  <p className="text-3xl font-bold mt-2">
+                    {stats.totalEvents.toLocaleString()}
+                  </p>
+                  <p className="text-xs opacity-80 mt-2">Across all classes</p>
                 </div>
                 <div className="p-3 bg-white/20 rounded-xl">
                   <Activity size={24} />
@@ -496,17 +626,29 @@ export default function VisualizationDashboard() {
             <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-500 font-medium">Audio Events</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{stats.audioEvents.toLocaleString()}</p>
+                  <p className="text-sm text-gray-500 font-medium">
+                    Audio Events
+                  </p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">
+                    {stats.audioEvents.toLocaleString()}
+                  </p>
                   <div className="flex items-center gap-1 mt-2">
                     <div className="w-full bg-gray-200 rounded-full h-1.5">
-                      <div 
+                      <div
                         className="bg-cyan-500 h-1.5 rounded-full"
-                        style={{ width: `${stats.totalEvents ? (stats.audioEvents / stats.totalEvents * 100) : 0}%` }}
+                        style={{
+                          width: `${stats.totalEvents ? (stats.audioEvents / stats.totalEvents) * 100 : 0}%`,
+                        }}
                       ></div>
                     </div>
                     <span className="text-xs text-gray-500">
-                      {stats.totalEvents ? ((stats.audioEvents / stats.totalEvents) * 100).toFixed(1) : 0}%
+                      {stats.totalEvents
+                        ? (
+                            (stats.audioEvents / stats.totalEvents) *
+                            100
+                          ).toFixed(1)
+                        : 0}
+                      %
                     </span>
                   </div>
                 </div>
@@ -519,17 +661,29 @@ export default function VisualizationDashboard() {
             <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-500 font-medium">Vision Events</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{stats.visionEvents.toLocaleString()}</p>
+                  <p className="text-sm text-gray-500 font-medium">
+                    Vision Events
+                  </p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">
+                    {stats.visionEvents.toLocaleString()}
+                  </p>
                   <div className="flex items-center gap-1 mt-2">
                     <div className="w-full bg-gray-200 rounded-full h-1.5">
-                      <div 
+                      <div
                         className="bg-purple-500 h-1.5 rounded-full"
-                        style={{ width: `${stats.totalEvents ? (stats.visionEvents / stats.totalEvents * 100) : 0}%` }}
+                        style={{
+                          width: `${stats.totalEvents ? (stats.visionEvents / stats.totalEvents) * 100 : 0}%`,
+                        }}
                       ></div>
                     </div>
                     <span className="text-xs text-gray-500">
-                      {stats.totalEvents ? ((stats.visionEvents / stats.totalEvents) * 100).toFixed(1) : 0}%
+                      {stats.totalEvents
+                        ? (
+                            (stats.visionEvents / stats.totalEvents) *
+                            100
+                          ).toFixed(1)
+                        : 0}
+                      %
                     </span>
                   </div>
                 </div>
@@ -542,17 +696,29 @@ export default function VisualizationDashboard() {
             <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-500 font-medium">Suspicious</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{stats.suspiciousEvents.toLocaleString()}</p>
+                  <p className="text-sm text-gray-500 font-medium">
+                    Suspicious
+                  </p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">
+                    {stats.suspiciousEvents.toLocaleString()}
+                  </p>
                   <div className="flex items-center gap-1 mt-2">
                     <div className="w-full bg-gray-200 rounded-full h-1.5">
-                      <div 
+                      <div
                         className="bg-red-500 h-1.5 rounded-full"
-                        style={{ width: `${stats.totalEvents ? (stats.suspiciousEvents / stats.totalEvents * 100) : 0}%` }}
+                        style={{
+                          width: `${stats.totalEvents ? (stats.suspiciousEvents / stats.totalEvents) * 100 : 0}%`,
+                        }}
                       ></div>
                     </div>
                     <span className="text-xs text-gray-500">
-                      {stats.totalEvents ? ((stats.suspiciousEvents / stats.totalEvents) * 100).toFixed(1) : 0}%
+                      {stats.totalEvents
+                        ? (
+                            (stats.suspiciousEvents / stats.totalEvents) *
+                            100
+                          ).toFixed(1)
+                        : 0}
+                      %
                     </span>
                   </div>
                 </div>
@@ -565,8 +731,12 @@ export default function VisualizationDashboard() {
             <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-500 font-medium">AI Confidence</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{formatPercent(stats.averageConfidence/100)}</p>
+                  <p className="text-sm text-gray-500 font-medium">
+                    AI Confidence
+                  </p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">
+                    {formatPercent(stats.averageConfidence)}
+                  </p>
                   <p className="text-xs text-gray-500 mt-2">Average accuracy</p>
                 </div>
                 <div className="p-2.5 bg-green-50 rounded-lg">
@@ -581,30 +751,39 @@ export default function VisualizationDashboard() {
             <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
               <div className="flex flex-wrap gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Exam Filter</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Class Filter
+                  </label>
                   <select
-                    value={selectedExam}
-                    onChange={(e) => setSelectedExam(e.target.value)}
+                    value={selectedClass}
+                    onChange={(e) => setSelectedClass(e.target.value)}
                     className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm bg-white"
                   >
-                    <option value="all">All Exams</option>
-                    {exams.map((exam) => (
-                      <option key={exam.id} value={exam.id}>
-                        {exam.name}
+                    <option value="all">All Classes</option>
+                    {classes.map((classItem) => (
+                      <option key={classItem.id} value={classItem.id}>
+                        {classItem.name}
                       </option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Date Range
+                  </label>
                   <div className="flex gap-2">
                     <div className="relative">
                       <Calendar className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                       <input
                         type="date"
                         value={dateRange.start}
-                        onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                        onChange={(e) =>
+                          setDateRange((prev) => ({
+                            ...prev,
+                            start: e.target.value,
+                          }))
+                        }
                         className="pl-8 pr-2 py-2 border border-gray-200 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm w-32"
                       />
                     </div>
@@ -613,7 +792,12 @@ export default function VisualizationDashboard() {
                       <input
                         type="date"
                         value={dateRange.end}
-                        onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                        onChange={(e) =>
+                          setDateRange((prev) => ({
+                            ...prev,
+                            end: e.target.value,
+                          }))
+                        }
                         className="pl-8 pr-2 py-2 border border-gray-200 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm w-32"
                       />
                     </div>
@@ -621,10 +805,14 @@ export default function VisualizationDashboard() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Timeframe</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Timeframe
+                  </label>
                   <select
                     value={selectedTimeframe}
-                    onChange={(e) => setSelectedTimeframe(e.target.value as any)}
+                    onChange={(e) =>
+                      setSelectedTimeframe(e.target.value as any)
+                    }
                     className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm bg-white"
                   >
                     <option value="24h">Last 24 Hours</option>
@@ -653,8 +841,12 @@ export default function VisualizationDashboard() {
             <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h3 className="text-lg font-bold text-gray-900">Event Type Distribution</h3>
-                  <p className="text-sm text-gray-600">Audio vs Vision Events</p>
+                  <h3 className="text-lg font-bold text-gray-900">
+                    Event Type Distribution
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    Audio vs Vision Events
+                  </p>
                 </div>
                 <PieChart className="w-5 h-5 text-blue-500" />
               </div>
@@ -666,7 +858,9 @@ export default function VisualizationDashboard() {
                       cx="50%"
                       cy="50%"
                       labelLine={false}
-                      label={({ name, percent }) => `${name}: ${((percent ?? 0) * 100).toFixed(0)}%`}
+                      label={({ name, percent }) =>
+                        `${name}: ${((percent ?? 0) * 100).toFixed(0)}%`
+                      }
                       outerRadius={80}
                       fill="#8884d8"
                       dataKey="value"
@@ -686,8 +880,12 @@ export default function VisualizationDashboard() {
             <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h3 className="text-lg font-bold text-gray-900">Suspicious Events Analysis</h3>
-                  <p className="text-sm text-gray-600">Normal vs Suspicious Activities</p>
+                  <h3 className="text-lg font-bold text-gray-900">
+                    Suspicious Events Analysis
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    Normal vs Suspicious Activities
+                  </p>
                 </div>
                 <Shield className="w-5 h-5 text-red-500" />
               </div>
@@ -712,8 +910,12 @@ export default function VisualizationDashboard() {
             <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h3 className="text-lg font-bold text-gray-900">Hourly Activity Pattern</h3>
-                  <p className="text-sm text-gray-600">Events distribution by hour</p>
+                  <h3 className="text-lg font-bold text-gray-900">
+                    Hourly Activity Pattern
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    Events distribution by hour
+                  </p>
                 </div>
                 <Clock className="w-5 h-5 text-amber-500" />
               </div>
@@ -724,8 +926,20 @@ export default function VisualizationDashboard() {
                     <XAxis dataKey="hour" stroke="#6b7280" />
                     <YAxis stroke="#6b7280" />
                     <Tooltip content={<CustomTooltip />} />
-                    <Area type="monotone" dataKey="total" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.3} />
-                    <Area type="monotone" dataKey="suspicious" stroke="#ef4444" fill="#ef4444" fillOpacity={0.3} />
+                    <Area
+                      type="monotone"
+                      dataKey="total"
+                      stroke="#3b82f6"
+                      fill="#3b82f6"
+                      fillOpacity={0.3}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="suspicious"
+                      stroke="#ef4444"
+                      fill="#ef4444"
+                      fillOpacity={0.3}
+                    />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -735,8 +949,12 @@ export default function VisualizationDashboard() {
             <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h3 className="text-lg font-bold text-gray-900">Event Labels Distribution</h3>
-                  <p className="text-sm text-gray-600">Most common detection types</p>
+                  <h3 className="text-lg font-bold text-gray-900">
+                    Event Labels Distribution
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    Most common detection types
+                  </p>
                 </div>
                 <Bell className="w-5 h-5 text-purple-500" />
               </div>
@@ -745,7 +963,12 @@ export default function VisualizationDashboard() {
                   <BarChart data={chartData.labelData} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis type="number" stroke="#6b7280" />
-                    <YAxis type="category" dataKey="name" stroke="#6b7280" width={80} />
+                    <YAxis
+                      type="category"
+                      dataKey="name"
+                      stroke="#6b7280"
+                      width={80}
+                    />
                     <Tooltip content={<CustomTooltip />} />
                     <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                       {chartData.labelData.map((entry, index) => (
@@ -764,7 +987,9 @@ export default function VisualizationDashboard() {
             <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h3 className="text-lg font-bold text-gray-900">Weekly Activity</h3>
+                  <h3 className="text-lg font-bold text-gray-900">
+                    Weekly Activity
+                  </h3>
                   <p className="text-sm text-gray-600">Events by day of week</p>
                 </div>
                 <TrendingUp className="w-5 h-5 text-green-500" />
@@ -776,8 +1001,20 @@ export default function VisualizationDashboard() {
                     <XAxis dataKey="day" stroke="#6b7280" />
                     <YAxis stroke="#6b7280" />
                     <Tooltip content={<CustomTooltip />} />
-                    <Line type="monotone" dataKey="total" stroke="#3b82f6" strokeWidth={2} dot={{ r: 4 }} />
-                    <Line type="monotone" dataKey="suspicious" stroke="#ef4444" strokeWidth={2} dot={{ r: 4 }} />
+                    <Line
+                      type="monotone"
+                      dataKey="total"
+                      stroke="#3b82f6"
+                      strokeWidth={2}
+                      dot={{ r: 4 }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="suspicious"
+                      stroke="#ef4444"
+                      strokeWidth={2}
+                      dot={{ r: 4 }}
+                    />
                   </RechartsLineChart>
                 </ResponsiveContainer>
               </div>
@@ -787,8 +1024,12 @@ export default function VisualizationDashboard() {
             <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h3 className="text-lg font-bold text-gray-900">AI Confidence Levels</h3>
-                  <p className="text-sm text-gray-600">Distribution by confidence range</p>
+                  <h3 className="text-lg font-bold text-gray-900">
+                    AI Confidence Levels
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    Distribution by confidence range
+                  </p>
                 </div>
                 <Target className="w-5 h-5 text-blue-500" />
               </div>
@@ -801,15 +1042,19 @@ export default function VisualizationDashboard() {
                     <Tooltip content={<CustomTooltip />} />
                     <Bar dataKey="count" radius={[4, 4, 0, 0]} fill="#60a5fa">
                       {chartData.confidenceData.map((entry, index) => (
-                        <Cell 
-                          key={`cell-${index}`} 
+                        <Cell
+                          key={`cell-${index}`}
                           fill={
-                            index === 4 ? '#10b981' : 
-                            index === 3 ? '#3b82f6' : 
-                            index === 2 ? '#f59e0b' : 
-                            index === 1 ? '#f97316' : 
-                            '#ef4444'
-                          } 
+                            index === 4
+                              ? "#10b981"
+                              : index === 3
+                                ? "#3b82f6"
+                                : index === 2
+                                  ? "#f59e0b"
+                                  : index === 1
+                                    ? "#f97316"
+                                    : "#ef4444"
+                          }
                         />
                       ))}
                     </Bar>
@@ -818,38 +1063,57 @@ export default function VisualizationDashboard() {
               </div>
             </div>
 
-            {/* Top Students */}
+            {/* Top Devices */}
             <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h3 className="text-lg font-bold text-gray-900">Top Students</h3>
-                  <p className="text-sm text-gray-600">Most monitored students</p>
+                  <h3 className="text-lg font-bold text-gray-900">
+                    Top Devices
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    Most monitored devices
+                  </p>
                 </div>
                 <UserCheck className="w-5 h-5 text-indigo-500" />
               </div>
               <div className="space-y-4">
-                {topStudents.map((student, index) => (
-                  <div key={student.name} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                {topDevices.map((device, index) => (
+                  <div
+                    key={device.name}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                  >
                     <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-medium ${
-                        index === 0 ? 'bg-gradient-to-r from-amber-500 to-orange-500' :
-                        index === 1 ? 'bg-gradient-to-r from-gray-400 to-gray-600' :
-                        index === 2 ? 'bg-gradient-to-r from-amber-700 to-amber-900' :
-                        'bg-gradient-to-r from-blue-400 to-cyan-400'
-                      }`}>
-                        {student.name.charAt(0).toUpperCase()}
+                      <div
+                        className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-medium ${
+                          index === 0
+                            ? "bg-gradient-to-r from-amber-500 to-orange-500"
+                            : index === 1
+                              ? "bg-gradient-to-r from-gray-400 to-gray-600"
+                              : index === 2
+                                ? "bg-gradient-to-r from-amber-700 to-amber-900"
+                                : "bg-gradient-to-r from-blue-400 to-cyan-400"
+                        }`}
+                      >
+                        {device.name.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <p className="font-medium text-gray-900">{student.name}</p>
-                        <p className="text-xs text-gray-500">{student.events} events</p>
+                        <p className="font-medium text-gray-900">
+                          {device.name}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {device.events} events
+                        </p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className={`text-sm font-medium ${student.suspicious > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                        {student.suspicious} suspicious
+                      <p
+                        className={`text-sm font-medium ${device.suspicious > 0 ? "text-red-600" : "text-green-600"}`}
+                      >
+                        {device.suspicious} suspicious
                       </p>
                       <p className="text-xs text-gray-500">
-                        {((student.suspicious / student.events) * 100).toFixed(1)}%
+                        {((device.suspicious / device.events) * 100).toFixed(1)}
+                        %
                       </p>
                     </div>
                   </div>
@@ -865,25 +1129,37 @@ export default function VisualizationDashboard() {
                 <Brain className="w-6 h-6 text-blue-500" />
               </div>
               <div className="flex-1">
-                <h3 className="text-lg font-bold text-gray-900 mb-2">AI Insights & Recommendations</h3>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">
+                  AI Insights & Recommendations
+                </h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="bg-white/70 rounded-lg p-4">
-                    <p className="text-sm font-medium text-gray-900 mb-1">Peak Monitoring Hours</p>
+                    <p className="text-sm font-medium text-gray-900 mb-1">
+                      Peak Monitoring Hours
+                    </p>
                     <p className="text-sm text-gray-600">
-                      Most events occur between 10 AM - 2 PM. Consider scheduling additional proctors during these hours.
+                      Most events occur between 10 AM - 2 PM. Consider
+                      scheduling additional proctors during these hours.
                     </p>
                   </div>
                   <div className="bg-white/70 rounded-lg p-4">
-                    <p className="text-sm font-medium text-gray-900 mb-1">Common Violation</p>
+                    <p className="text-sm font-medium text-gray-900 mb-1">
+                      Common Violation
+                    </p>
                     <p className="text-sm text-gray-600">
-                      &quot;Looking away&quot; is the most frequent suspicious event. Consider adjusting camera angles.
+                      &quot;Looking away&quot; is the most frequent suspicious
+                      event. Consider adjusting camera angles.
                     </p>
                   </div>
                   <div className="bg-white/70 rounded-lg p-4">
-                    <p className="text-sm font-medium text-gray-900 mb-1">AI Performance</p>
+                    <p className="text-sm font-medium text-gray-900 mb-1">
+                      AI Performance
+                    </p>
                     <p className="text-sm text-gray-600">
-                      AI confidence is {(stats.averageConfidence * 100).toFixed(1)}%. 
-                      {stats.averageConfidence > 0.8 ? " Excellent performance!" : " Consider recalibration."}
+                      AI confidence is {stats.averageConfidence.toFixed(1)}%.
+                      {stats.averageConfidence > 0.8
+                        ? " Excellent performance!"
+                        : " Consider recalibration."}
                     </p>
                   </div>
                 </div>
@@ -897,8 +1173,12 @@ export default function VisualizationDashboard() {
           <div className="px-4 sm:px-6 lg:px-8 py-6">
             <div className="flex flex-col md:flex-row justify-between items-center">
               <div>
-                <h3 className="text-sm font-semibold text-gray-900">Argus Analytics Dashboard</h3>
-                <p className="text-gray-600 text-xs mt-1">AI-powered exam monitoring visualization system</p>
+                <h3 className="text-sm font-semibold text-gray-900">
+                  Argus Analytics Dashboard
+                </h3>
+                <p className="text-gray-600 text-xs mt-1">
+                  AI-powered exam monitoring visualization system
+                </p>
               </div>
               <div className="mt-4 md:mt-0 flex items-center gap-4">
                 <button className="text-xs text-gray-500 hover:text-blue-600 transition-colors">
